@@ -3,6 +3,7 @@ import { volunteerProfileSchema, type VolunteerProfileInput } from "../validatio
 import { FormWrapper, FormField, Button, Card, CardContent, CardFooter } from "@/components/ui";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { api } from "@/lib/api-client";
+import { queryClient } from "@/lib/query-client";
 import { toast } from "@/stores/toast.store";
 
 interface VolunteerProfile {
@@ -21,11 +22,14 @@ interface VolunteerProfile {
 
 export function VolunteerProfileForm({ initialData }: { initialData: VolunteerProfile }) {
   const [isPending, setIsPending] = useState(false);
+  const [uploading, setUploading] = useState({ photo: false, ktp: false, cv: false });
+  const isUploading = Object.values(uploading).some(Boolean);
   const [photo, setPhoto] = useState({ url: initialData.photoUrl ?? "", publicId: initialData.photoPublicId ?? "" });
   const [ktp, setKtp] = useState({ url: initialData.ktpUrl ?? "", publicId: initialData.ktpPublicId ?? "" });
   const [cv, setCv] = useState({ url: initialData.cvUrl ?? "", publicId: initialData.cvPublicId ?? "" });
 
   const onSubmit = async (data: VolunteerProfileInput) => {
+    if (isUploading) return;
     setIsPending(true);
     try {
       await api.patch("/volunteers/profile", {
@@ -37,6 +41,7 @@ export function VolunteerProfileForm({ initialData }: { initialData: VolunteerPr
         cvUrl: cv.url || undefined,
         cvPublicId: cv.publicId || undefined,
       });
+      await queryClient.invalidateQueries({ queryKey: ["volunteer"] });
       toast.success("Profil berhasil diperbarui!");
     } catch (err: any) {
       toast.error(err?.message ?? "Gagal memperbarui profil");
@@ -74,6 +79,7 @@ export function VolunteerProfileForm({ initialData }: { initialData: VolunteerPr
             initialUrl={initialData.photoUrl ?? ""}
             initialPublicId={initialData.photoPublicId ?? ""}
             onUpload={setPhoto}
+            onUploadingChange={(value) => setUploading((prev) => ({ ...prev, photo: value }))}
             onRemove={() => setPhoto({ url: "", publicId: "" })}
           />
           <FileUpload
@@ -85,6 +91,7 @@ export function VolunteerProfileForm({ initialData }: { initialData: VolunteerPr
             initialUrl={initialData.ktpUrl ?? ""}
             initialPublicId={initialData.ktpPublicId ?? ""}
             onUpload={setKtp}
+            onUploadingChange={(value) => setUploading((prev) => ({ ...prev, ktp: value }))}
             onRemove={() => setKtp({ url: "", publicId: "" })}
           />
           <FileUpload
@@ -96,12 +103,13 @@ export function VolunteerProfileForm({ initialData }: { initialData: VolunteerPr
             initialUrl={initialData.cvUrl ?? ""}
             initialPublicId={initialData.cvPublicId ?? ""}
             onUpload={setCv}
+            onUploadingChange={(value) => setUploading((prev) => ({ ...prev, cv: value }))}
             onRemove={() => setCv({ url: "", publicId: "" })}
           />
         </CardContent>
 
         <CardFooter className="flex justify-end border-t border-surface-soft pt-6 mt-6">
-          <Button type="submit" isLoading={isPending} disabled={isPending}>
+          <Button type="submit" isLoading={isPending} disabled={isPending || isUploading}>
             Simpan Perubahan
           </Button>
         </CardFooter>

@@ -76,11 +76,10 @@ export class CloudinaryProvider implements IUploadProvider {
 
   async delete(publicId: string): Promise<void> {
     this.ensureConfigured();
-    // Try deleting as 'auto' (covers image, video, raw/PDF).
-    // Cloudinary destroy requires the correct resource_type; using 'image'
-    // (the default) would silently fail for PDFs stored as 'raw'.
-    await cloudinary.uploader.destroy(publicId, { resource_type: "raw" }).catch(() =>
-      cloudinary.uploader.destroy(publicId, { resource_type: "image" }),
-    );
+    // Missing assets return "not found", rather than throwing an error.
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+    if (result.result === "not found") {
+      await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
+    }
   }
 }

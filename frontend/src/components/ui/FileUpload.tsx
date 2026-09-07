@@ -28,6 +28,7 @@ interface FileUploadProps {
    * Called when upload succeeds. Passes the uploaded image URL and its publicId.
    */
   onUpload: (payload: { url: string; publicId: string }) => void;
+  onUploadingChange?: (uploading: boolean) => void;
   /**
    * Called when the file is removed.
    */
@@ -52,6 +53,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   required = false,
   forceValidate = false,
   onUpload,
+  onUploadingChange,
   onRemove,
   initialUrl = "",
   initialPublicId = "",
@@ -100,6 +102,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     const controller = new AbortController();
     abortControllerRef.current = controller;
     setUploading(true);
+    onUploadingChange?.(true);
 
     // Keep track of the newly-uploaded file we need to clean up if this upload succeeds
     const oldPublicIdToDelete = (currentPublicId && currentPublicId !== initialPublicId) ? currentPublicId : null;
@@ -147,6 +150,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       }
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
       abortControllerRef.current = null;
     }
   };

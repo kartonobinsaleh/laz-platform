@@ -39,6 +39,8 @@ export function SettingsPage() {
               name: user.name ?? null,
               email: user.email,
               phoneNumber: user.phoneNumber ?? null,
+              avatarUrl: user.avatarUrl ?? null,
+              avatarPublicId: user.avatarPublicId ?? null,
               emailNotifications: user.emailNotifications ?? true,
               waNotifications: user.waNotifications ?? true,
             }}

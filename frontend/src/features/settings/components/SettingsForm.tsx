@@ -10,6 +10,8 @@ interface SettingsFormProps {
     name: string | null;
     email: string;
     phoneNumber: string | null;
+    avatarUrl?: string | null;
+    avatarPublicId?: string | null;
     emailNotifications: boolean;
     waNotifications: boolean;
   };
