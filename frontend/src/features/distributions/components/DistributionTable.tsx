@@ -48,8 +48,8 @@ export function DistributionTable({
       header: "Rincian Penyaluran",
       cell: (dist) => (
         <div className="max-w-[250px]">
-          <div className="font-medium text-primary mb-1">{dist.title}</div>
-          <div className="text-xs text-secondary line-clamp-2">{dist.description}</div>
+          <div className="font-medium text-primary mb-1 truncate" title={dist.title}>{dist.title}</div>
+          <div className="text-xs text-secondary truncate" title={dist.description}>{dist.description}</div>
         </div>
       ),
     },
