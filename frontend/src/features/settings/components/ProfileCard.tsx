@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Card,
   CardHeader,
@@ -22,8 +22,8 @@ interface ProfileCardProps {
     name: string | null;
     email: string;
     phoneNumber: string | null;
-    avatarUrl?: string;
-    avatarPublicId?: string;
+    avatarUrl?: string | null;
+    avatarPublicId?: string | null;
   };
 }
 
@@ -32,8 +32,12 @@ export function ProfileCard({ user }: ProfileCardProps) {
   const [name, setName] = useState(user.name || "");
   const [phoneNumber, setPhoneNumber] = useState(user.phoneNumber || "");
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
-  const [avatarPublicId, setAvatarPublicId] = useState(user.avatarPublicId || "");
+  const avatarInput = useRef<HTMLInputElement>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+
+  useEffect(() => {
+    setAvatarUrl(user.avatarUrl || "");
+  }, [user.avatarUrl]);
 
   const handleAvatarUpload = async (payload: { url: string; publicId: string }) => {
     const formData = new FormData();
@@ -45,13 +49,17 @@ export function ProfileCard({ user }: ProfileCardProps) {
     } else {
       toast.success("Foto Profil berhasil diperbarui!");
       setAvatarUrl(payload.url);
-      setAvatarPublicId(payload.publicId);
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    e.target.value = "";
+    if (!file || isAvatarUploading) return;
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      toast.error("Foto profil harus berformat PNG atau JPG/JPEG.");
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       toast.error("File terlalu besar. Maksimum 10 MB.");
       return;
@@ -124,7 +132,8 @@ export function ProfileCard({ user }: ProfileCardProps) {
               {/* Pencil icon overlay */}
               <button
                 type="button"
-                onClick={() => document.getElementById('avatar')?.click()}
+                onClick={() => avatarInput.current?.click()}
+                disabled={isAvatarUploading}
                 className="absolute bottom-0 right-0 flex items-center bg-white rounded-md px-2 py-1 shadow-md hover:bg-surface-muted transition transform translate-x-2"
                 aria-label="Ubah foto profil"
               >
@@ -132,15 +141,17 @@ export function ProfileCard({ user }: ProfileCardProps) {
                 <span className="ml-1 text-sm text-primary">Edit</span>
               </button>
             </div>
-            <p className="mt-2 text-sm text-secondary">Foto Profil</p>
+            <p className="mt-2 text-sm text-secondary">Foto Profil · PNG atau JPG/JPEG, maks. 10 MB</p>
           </div>
 
           {/* Hidden native file input for avatar upload */}
           <input
             id="avatar"
+            ref={avatarInput}
             name="avatar"
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg"
+            disabled={isAvatarUploading}
             className="hidden"
             onChange={handleFileSelect}
           />
