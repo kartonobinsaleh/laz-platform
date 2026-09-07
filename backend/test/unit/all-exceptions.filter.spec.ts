@@ -86,6 +86,24 @@ describe("AllExceptionsFilter", () => {
     });
   });
 
+  it("maps Prisma P2003 → 409 with a clear related-data message", () => {
+    const { host, json } = makeHost();
+    const err = new Prisma.PrismaClientKnownRequestError("Foreign key constraint", {
+      code: "P2003",
+      clientVersion: "7.0.0",
+    });
+
+    filter.catch(err, host);
+
+    expect(json).toHaveBeenCalledWith({
+      success: false,
+      error: {
+        code: "RELATED_DATA_EXISTS",
+        message: "Data tidak dapat dihapus karena masih digunakan oleh data lain",
+      },
+    });
+  });
+
   it("maps AppError → its own status code and machine-readable code", () => {
     const { host, json } = makeHost();
     const err = new AppError("EMAIL_TAKEN", "Email sudah terdaftar", 409);

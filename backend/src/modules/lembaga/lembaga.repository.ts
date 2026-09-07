@@ -86,6 +86,29 @@ export class LembagaRepository {
     });
   }
 
+  async getDeletionDependencies(id: string) {
+    const lembaga = await this.prisma.lembaga.findUnique({
+      where: { id },
+      select: {
+        _count: {
+          select: {
+            programs: true,
+            donations: true,
+            distributions: true,
+            payments: true,
+            volunteerActivities: true,
+            volunteerApplications: true,
+            withdrawals: true,
+            journals: true,
+            amilPlatformChangeRequests: true,
+          },
+        },
+      },
+    });
+
+    return lembaga?._count ?? null;
+  }
+
   /**
    * Update an existing Lembaga's details.
    */

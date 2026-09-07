@@ -48,10 +48,11 @@ export function LembagaTable({ lembagas, search, pagination }: LembagaTableProps
       const result = await deleteLembagaAction(id);
       if (result.error) {
         toast.error(result.error);
-      } else {
-        toast.success(`Berhasil menghapus data lembaga "${name}"`);
-        window.location.reload();
+        return;
       }
+
+      toast.success(`Berhasil menghapus data lembaga "${name}"`);
+      window.location.reload();
       setConfirmState({ isOpen: false, lembaga: null });
     });
   };
@@ -109,7 +110,7 @@ export function LembagaTable({ lembagas, search, pagination }: LembagaTableProps
         onClose={() => setConfirmState({ isOpen: false, lembaga: null })}
         onConfirm={handleConfirmDelete}
         title="Konfirmasi Hapus Lembaga"
-        message={`Apakah Anda yakin ingin menghapus lembaga "${confirmState.lembaga?.name}"? Seluruh data yang terhubung dengan tenant ini akan ikut terhapus dan tidak dapat dikembalikan.`}
+        message={`Apakah Anda yakin ingin menghapus lembaga "${confirmState.lembaga?.name}"? Lembaga hanya dapat dihapus jika belum memiliki program, transaksi, atau aktivitas terkait.`}
         confirmText="Hapus"
         cancelText="Batal"
         intent="destructive"

@@ -262,6 +262,32 @@ export class LembagaService {
       throw new NotFoundException("Lembaga tidak ditemukan");
     }
 
+    const dependencies = await this.lembagaRepository.getDeletionDependencies(id);
+    const dependencyLabels: Array<[keyof NonNullable<typeof dependencies>, string]> = [
+      ["programs", "program"],
+      ["donations", "donasi"],
+      ["distributions", "penyaluran"],
+      ["payments", "pembayaran"],
+      ["volunteerActivities", "kegiatan relawan"],
+      ["volunteerApplications", "pendaftaran relawan"],
+      ["withdrawals", "penarikan dana"],
+      ["journals", "jurnal"],
+      ["amilPlatformChangeRequests", "pengajuan perubahan porsi amil"],
+    ];
+    const blockers = dependencies
+      ? dependencyLabels
+          .filter(([key]) => dependencies[key] > 0)
+          .map(([key, label]) => `${dependencies[key]} ${label}`)
+      : [];
+
+    if (blockers.length > 0) {
+      throw new AppError(
+        "LEMBAGA_HAS_RELATED_DATA",
+        `Lembaga "${existing.name}" tidak dapat dihapus karena masih memiliki ${blockers.join(", ")}. Hapus data terkait terlebih dahulu.`,
+        409,
+      );
+    }
+
     const deleted = await this.lembagaRepository.delete(id);
 
     await this.auditService.log({

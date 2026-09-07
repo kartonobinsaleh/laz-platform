@@ -63,6 +63,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
           error: { code: "NOT_FOUND", message: "Data tidak ditemukan" },
         });
       }
+      if (exception.code === "P2003") {
+        return res.status(HttpStatus.CONFLICT).json({
+          success: false,
+          error: {
+            code: "RELATED_DATA_EXISTS",
+            message: "Data tidak dapat dihapus karena masih digunakan oleh data lain",
+          },
+        });
+      }
     }
 
     if (exception instanceof AppError) {
