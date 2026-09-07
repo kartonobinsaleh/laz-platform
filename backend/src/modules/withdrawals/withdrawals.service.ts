@@ -122,7 +122,8 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       // Serialisasi create pada tenant yang sama; unique(lembagaId) tetap
       // menjadi lapisan pertahanan terakhir di database.
-      await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lembagaId}))`);
+      // Fungsi lock mengembalikan void, yang tidak dapat dideserialisasi Prisma.
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lembagaId}))`);
 
       const existingBank = await tx.lembagaBankAccount.findUnique({
         where: { lembagaId },
