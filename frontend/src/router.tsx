@@ -274,7 +274,7 @@ export const router = createBrowserRouter([
           {
             path: "withdrawals/platform",
             element: (
-              <RequirePermission permission={PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE}>
+              <RequirePermission permission={PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE} requiresPlatformFinance>
                 <PlatformWithdrawalPage />
               </RequirePermission>
             ),

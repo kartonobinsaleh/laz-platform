@@ -9,6 +9,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { usePermission } from "@/hooks/usePermission";
 import type { NavItem } from "@/constants/nav";
 import { NAV_ITEMS } from "@/constants/nav";
+import { isPlatformFinance } from "@shared/lib/platform-finance";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { logger } from "@/lib/logger";
@@ -113,12 +114,14 @@ export function Sidebar({ initialItems, user }: { initialItems?: NavItem[], user
       // null — item yang hanya relevan untuk staff satu lembaga (mis. profil
       // lembaga sendiri) harus tetap difilter berdasarkan lembagaId asli.
       if (item.requiresLembaga && !authUser?.lembagaId) return false;
+      if (item.requiresPlatformFinance && !isPlatformFinance(authUser)) return false;
       
       // Hide parent group if all its children are inaccessible
       if (item.children && item.children.length > 0) {
         const hasVisibleChild = item.children.some(child => {
           if (child.permission && !can(child.permission)) return false;
           if (child.requiresLembaga && !authUser?.lembagaId) return false;
+          if (child.requiresPlatformFinance && !isPlatformFinance(authUser)) return false;
           return true;
         });
         if (!hasVisibleChild) return false;
@@ -277,6 +280,7 @@ export function Sidebar({ initialItems, user }: { initialItems?: NavItem[], user
                             {item.children.map(child => {
                               if (child.permission && !can(child.permission)) return null;
                               if (child.requiresLembaga && !authUser?.lembagaId) return null;
+                              if (child.requiresPlatformFinance && !isPlatformFinance(authUser)) return null;
                               const isChildActive = child.href === activeHref;
                               const ChildIcon = iconMap[child.icon] || HelpCircle;
                               return (

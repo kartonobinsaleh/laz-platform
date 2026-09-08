@@ -106,10 +106,21 @@ export function useGetMyWithdrawals(page = 1, limit = 20) {
 export function useGetAllWithdrawals(status?: string, page = 1, limit = 20) {
   return useQuery({
     queryKey: ["all-withdrawals", status, page, limit],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, meta } = await api.get<Withdrawal[]>("/withdrawals", { status, page, limit });
       return { data, meta };
     },
+  });
+}
+
+export function usePlatformWithdrawals(page = 1, limit = 10) {
+  return useQuery({
+    queryKey: ["all-withdrawals", "platform", page, limit],
+    queryFn: () => api.get<Withdrawal[]>("/withdrawals/platform", { page, limit }),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 

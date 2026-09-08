@@ -77,7 +77,7 @@ const PERMISSION_DEFINITIONS = [
   { key: "withdrawals.read", description: "Melihat daftar pencairan dana" },
   { key: "withdrawals.read_all", description: "Melihat pencairan dana dan payout seluruh lembaga" },
   { key: "withdrawals.create", description: "Membuat request pencairan dana (Lembaga)" },
-  { key: "withdrawals.manage", description: "Menyetujui/menolak pencairan dana (Super Admin)" },
+  { key: "withdrawals.manage", description: "Menyetujui/menolak pencairan dana dan mencoba ulang payout (Super Admin dan Finance Platform)" },
   { key: "platform_withdrawals.create", description: "Mengatur rekening dan membuat penarikan porsi amil Platform" },
   // Accounting
   { key: "coa.read", description: "Melihat daftar Chart of Accounts lembaga" },
@@ -103,6 +103,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "platform_finance.read",
     "withdrawals.read",
     "withdrawals.read_all",
+    "withdrawals.manage",
     "platform_withdrawals.create",
     "coa.read",
     "journal.read",
@@ -142,7 +143,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
 const ROLE_DEFINITIONS = [
   { name: "SUPER_ADMIN", description: "Full system access" },
-  { name: "FINANCE_PLATFORM", description: "Memantau keuangan lintas lembaga dan mengajukan penarikan amil platform" },
+  { name: "FINANCE_PLATFORM", description: "Memantau keuangan lintas lembaga, menyetujui/menolak pencairan dana, dan mengajukan penarikan amil platform" },
   { name: "LEMBAGA_ADMIN", description: "Mengelola program, donasi, dan relawan lembaga sendiri" },
 ];
 

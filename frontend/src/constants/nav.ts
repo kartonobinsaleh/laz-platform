@@ -20,6 +20,7 @@ export interface NavItem {
    * perlu difilter terpisah berdasarkan lembagaId, bukan permission saja.
    */
   requiresLembaga?: boolean;
+  requiresPlatformFinance?: boolean;
   children?: NavItem[];
 }
 
@@ -89,6 +90,7 @@ export const NAV_ITEMS: NavItem[] = [
         href: "/dashboard/withdrawals/platform",
         icon: "ArrowUpFromLine",
         permission: PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE,
+        requiresPlatformFinance: true,
       },
       {
         label: "Porsi Amil",

@@ -37,7 +37,7 @@ export class VolunteersService {
       status: "ACTIVE",
     });
 
-    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone };
+    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone, photoUrl: volunteer.photoUrl };
   }
 
   async signIn(credentials: VolunteerLoginInput): Promise<VolunteerSessionUser | null> {
@@ -51,13 +51,13 @@ export class VolunteersService {
       throw new AppError("ACCOUNT_INACTIVE", "Akun relawan ini tidak aktif", 403);
     }
 
-    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone };
+    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone, photoUrl: volunteer.photoUrl };
   }
 
   async getById(id: string): Promise<VolunteerSessionUser | null> {
     const volunteer = await this.volunteersRepository.findById(id);
     if (!volunteer || volunteer.status !== "ACTIVE") return null;
-    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone };
+    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone, photoUrl: volunteer.photoUrl };
   }
 
   /** Profil lengkap (tanpa password) untuk halaman edit profil relawan. */
@@ -81,6 +81,6 @@ export class VolunteersService {
       cvUrl: input.cvUrl || null,
       cvPublicId: input.cvPublicId || null,
     });
-    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone };
+    return { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone, photoUrl: volunteer.photoUrl };
   }
 }

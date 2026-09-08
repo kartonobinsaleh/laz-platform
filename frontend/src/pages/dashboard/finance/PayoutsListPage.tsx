@@ -39,6 +39,8 @@ export function PayoutsListPage() {
   const { data: result, isLoading } = useQuery({
     queryKey: ["payouts", { page, limit, status }],
     queryFn: () => api.get<any>("/withdrawals/payouts", { page, limit, status }),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const payouts = result?.data ?? [];

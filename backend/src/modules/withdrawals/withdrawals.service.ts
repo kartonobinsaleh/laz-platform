@@ -460,6 +460,23 @@ export class WithdrawalsService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
+  async getPlatformWithdrawals(page = 1, limit = 10) {
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger((page - 1) * limit)) {
+      throw new AppError("INVALID_PAGINATION", "Halaman harus positif dan batas data antara 1–100.", 400);
+    }
+    const where = { isPlatform: true };
+    const [data, total] = await Promise.all([
+      this.prisma.withdrawal.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.withdrawal.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
   async getAllWithdrawals(status?: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const where = status ? { status: status as any } : {};
