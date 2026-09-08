@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useRouter, usePathname } from "next/navigation";
+import { ExternalLink, Eye, FileText, MapPin, Phone, Mail } from "lucide-react";
 import { api, asAction } from "@/lib/api-client";
-import { PageHeader, Badge, Button, TableSkeleton, EmptyState, Select } from "@/components/ui";
+import { PageHeader, Badge, Button, TableSkeleton, EmptyState, Select, Dialog } from "@/components/ui";
 import { DataTableToolbar } from "@/components/ui/data-table";
 import { toast } from "@/stores/toast.store";
 
@@ -15,6 +16,37 @@ const STATUS_META: Record<string, { label: string; intent: "success" | "warning"
   COMPLETED: { label: "Selesai", intent: "success" },
 };
 
+interface VolunteerProfile {
+  name: string;
+  email: string;
+  phone: string;
+  addressDomicile?: string | null;
+  addressKtp?: string | null;
+  photoUrl?: string | null;
+  ktpUrl?: string | null;
+  cvUrl?: string | null;
+}
+
+interface VolunteerApplicationItem {
+  id: string;
+  status: string;
+  rejectionReason?: string | null;
+  reportText?: string | null;
+  reportFileUrl?: string | null;
+  createdAt: string;
+  volunteer: VolunteerProfile;
+  activity?: { title: string; quota?: number | null };
+}
+
+function ProfileField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-secondary">{label}</p>
+      <p className="mt-1 text-sm text-primary whitespace-pre-line">{value || "Belum dilengkapi"}</p>
+    </div>
+  );
+}
+
 export function VolunteerApplicationsPage() {
   const [searchParams] = useSearchParams();
   const router = useRouter();
@@ -24,6 +56,7 @@ export function VolunteerApplicationsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [revisingId, setRevisingId] = useState<string | null>(null);
   const [revisionNote, setRevisionNote] = useState("");
+  const [selectedApplication, setSelectedApplication] = useState<VolunteerApplicationItem | null>(null);
 
   const page = Number(searchParams.get("page") ?? 1);
   const limit = Number(searchParams.get("limit") ?? 10);
@@ -32,7 +65,7 @@ export function VolunteerApplicationsPage() {
 
   const { data: result, isLoading } = useQuery({
     queryKey: ["volunteer-applications", { page, limit, search, activityId }],
-    queryFn: () => api.get<any[]>("/lembaga/volunteer-applications", { page, limit, search, activityId }),
+    queryFn: () => api.get<VolunteerApplicationItem[]>("/lembaga/volunteer-applications", { page, limit, search, activityId }),
   });
 
   const { data: activitiesResult } = useQuery({
@@ -122,7 +155,7 @@ export function VolunteerApplicationsPage() {
         <TableSkeleton headers={["Relawan", "Kegiatan", "Status", "Aksi"]} rowCount={limit} columnTypes={["text", "text", "text", "action"]} />
       ) : applications.length > 0 ? (
         <div className="space-y-3">
-          {applications.map((app: any) => {
+          {applications.map((app) => {
             const meta = STATUS_META[app.status] ?? { label: app.status, intent: "warning" as const };
             return (
               <div key={app.id} className="bg-surface rounded-2xl border border-border/40 p-5 flex flex-col gap-4">
@@ -132,8 +165,11 @@ export function VolunteerApplicationsPage() {
                     <p className="text-xs text-secondary">{app.volunteer?.email} &middot; {app.volunteer?.phone}</p>
                     <p className="text-sm text-secondary mt-1">Kegiatan: <span className="font-semibold text-primary">{app.activity?.title}</span></p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <Badge intent={meta.intent}>{meta.label}</Badge>
+                    <Button size="sm" intent="outline" onClick={() => setSelectedApplication(app)}>
+                      <Eye className="mr-1.5 h-4 w-4" /> Detail Relawan
+                    </Button>
                     {app.status === "PENDING" && (
                       <div className="flex gap-2">
                         <Button size="sm" intent="primary" onClick={() => handleApprove(app.id)}>Setujui</Button>
@@ -167,6 +203,104 @@ export function VolunteerApplicationsPage() {
       ) : (
         <EmptyState title="Belum Ada Pendaftaran Relawan" description="Belum ada relawan yang mendaftar ke kegiatan lembaga Anda." />
       )}
+
+      <Dialog
+        isOpen={Boolean(selectedApplication)}
+        onClose={() => setSelectedApplication(null)}
+        title="Detail Calon Relawan"
+      >
+        {selectedApplication && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              {selectedApplication.volunteer.photoUrl ? (
+                <img
+                  src={selectedApplication.volunteer.photoUrl}
+                  alt={`Foto ${selectedApplication.volunteer.name}`}
+                  className="h-24 w-24 shrink-0 rounded-2xl object-cover border border-border/50"
+                />
+              ) : (
+                <div className="h-24 w-24 shrink-0 rounded-2xl bg-surface-muted flex items-center justify-center text-3xl font-bold text-secondary">
+                  {selectedApplication.volunteer.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-xl font-bold text-primary">{selectedApplication.volunteer.name}</p>
+                <p className="mt-1 text-sm text-secondary">
+                  Melamar untuk <span className="font-semibold text-primary">{selectedApplication.activity?.title}</span>
+                </p>
+                <p className="mt-1 text-xs text-secondary">
+                  Diajukan {new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeStyle: "short" }).format(new Date(selectedApplication.createdAt))}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl bg-surface-muted p-4 sm:grid-cols-2">
+              <div className="flex gap-3">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" />
+                <ProfileField label="Email" value={selectedApplication.volunteer.email} />
+              </div>
+              <div className="flex gap-3">
+                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" />
+                <ProfileField label="Nomor Telepon" value={selectedApplication.volunteer.phone} />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" />
+                <ProfileField label="Alamat Domisili" value={selectedApplication.volunteer.addressDomicile} />
+              </div>
+              <div className="flex gap-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" />
+                <ProfileField label="Alamat Sesuai KTP" value={selectedApplication.volunteer.addressKtp} />
+              </div>
+            </div>
+
+            <div className="border-t border-border/40 pt-5">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-secondary">Dokumen Pendukung</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {selectedApplication.volunteer.ktpUrl ? (
+                  <a
+                    href={selectedApplication.volunteer.ktpUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl border border-border/50 p-3 text-sm font-semibold text-primary hover:bg-surface-muted"
+                  >
+                    <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Dokumen KTP</span>
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border/60 p-3 text-sm text-secondary">KTP belum diunggah</div>
+                )}
+                {selectedApplication.volunteer.cvUrl ? (
+                  <a
+                    href={selectedApplication.volunteer.cvUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl border border-border/50 p-3 text-sm font-semibold text-primary hover:bg-surface-muted"
+                  >
+                    <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Curriculum Vitae</span>
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border/60 p-3 text-sm text-secondary">CV belum diunggah</div>
+                )}
+              </div>
+            </div>
+
+            {selectedApplication.status === "PENDING" && (
+              <div className="flex justify-end gap-2 border-t border-border/40 pt-5">
+                <Button intent="destructive" onClick={() => { setRejectingId(selectedApplication.id); setSelectedApplication(null); }}>
+                  Tolak
+                </Button>
+                <Button onClick={() => { handleApprove(selectedApplication.id); setSelectedApplication(null); }}>
+                  Setujui Relawan
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
 
       {rejectingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

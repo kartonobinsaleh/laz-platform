@@ -10,17 +10,19 @@ import {
   Dialog,
   ConfirmDialog,
   Textarea,
+  Pagination,
 } from "@/components/ui";
 import { toast } from "@/stores/toast.store";
 import { formatCurrency } from "@/lib/utils";
 import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@shared/constants/permissions";
+import { useTablePagination, useTablePaginationMeta } from "@/hooks/useTablePagination";
 
 export function AdminWithdrawalPage() {
   const { can } = usePermission();
   const canManageWithdrawals = can(PERMISSIONS.WITHDRAWALS_MANAGE);
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>("PENDING");
+  const { page, limit, searchParams, setSearchParams } = useTablePagination(20);
+  const statusFilter = searchParams.get("status") ?? "PENDING";
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<Withdrawal | null>(null);
   
   const [actionWithdrawalId, setActionWithdrawalId] = useState<string | null>(null);
@@ -29,7 +31,8 @@ export function AdminWithdrawalPage() {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { data: withdrawals, isLoading } = useGetAllWithdrawals(statusFilter === "ALL" ? undefined : statusFilter, page, 20);
+  const { data: withdrawals, isLoading } = useGetAllWithdrawals(statusFilter === "ALL" ? undefined : statusFilter, page, limit);
+  const pagination = useTablePaginationMeta(withdrawals?.meta, page, limit);
   const approveWithdrawal = useApproveWithdrawal();
   const rejectWithdrawal = useRejectWithdrawal();
   const retryPayout = useRetryPayout();
@@ -122,8 +125,10 @@ export function AdminWithdrawalPage() {
             key={status}
             intent={statusFilter === status ? "primary" : "outline"}
             onClick={() => {
-              setStatusFilter(status);
-              setPage(1);
+              const params = new URLSearchParams(searchParams);
+              params.set("status", status);
+              params.set("page", "1");
+              setSearchParams(params);
             }}
           >
             {status}
@@ -233,6 +238,7 @@ export function AdminWithdrawalPage() {
               </table>
             </div>
           )}
+          {!isLoading && <Pagination {...pagination} />}
         </CardContent>
       </Card>
     </div>

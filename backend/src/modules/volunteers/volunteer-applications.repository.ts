@@ -64,7 +64,21 @@ export class VolunteerApplicationsRepository {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          volunteer: { select: { name: true, email: true, phone: true, photoUrl: true } },
+          // Detail ini hanya dikembalikan dari endpoint dashboard yang dijaga
+          // VOLUNTEERS_MANAGE dan sudah dibatasi ke lembaga pemilik kegiatan.
+          // Jangan gunakan select ini pada endpoint publik/relawan lain.
+          volunteer: {
+            select: {
+              name: true,
+              email: true,
+              phone: true,
+              addressDomicile: true,
+              addressKtp: true,
+              photoUrl: true,
+              ktpUrl: true,
+              cvUrl: true,
+            },
+          },
           activity: { select: { title: true, quota: true } },
         },
       }),

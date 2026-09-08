@@ -8,4 +8,5 @@ export interface VolunteerSessionUser {
   name: string;
   email: string;
   phone: string;
+  photoUrl?: string | null;
 }

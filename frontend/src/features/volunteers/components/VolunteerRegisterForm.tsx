@@ -218,11 +218,21 @@ function StepNav({
         </Button>
       )}
       {isLast ? (
-        <Button type="submit" isLoading={isPending} className="flex-1 sm:flex-none px-8 text-sm font-semibold">
+        <Button key="submit" type="submit" isLoading={isPending} className="flex-1 sm:flex-none px-8 text-sm font-semibold">
           Daftar sebagai Relawan
         </Button>
       ) : (
-        <Button type="button" onClick={onNext} disabled={isPending} className="flex-1 sm:flex-none px-8 text-sm font-semibold">
+        <Button
+          key="next"
+          type="button"
+          onClick={(event) => {
+            // Cancel this click before validation can render the submit button.
+            event.preventDefault();
+            void onNext();
+          }}
+          disabled={isPending}
+          className="flex-1 sm:flex-none px-8 text-sm font-semibold"
+        >
           Lanjut →
         </Button>
       )}

@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api-client";
-import { PageHeader, TableSkeleton, Badge } from "@/components/ui";
-import { DataTableToolbar } from "@/components/ui/data-table";
+import { PageHeader, TableSkeleton, Badge, Pagination } from "@/components/ui";
+import { useTablePagination, useTablePaginationMeta } from "@/hooks/useTablePagination";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -30,19 +29,18 @@ const getStatusBadge = (status: string) => {
 };
 
 export function PayoutsListPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const page = Number(searchParams.get("page") ?? 1);
-  const limit = Number(searchParams.get("limit") ?? 10);
+  const { page, limit, searchParams, setSearchParams } = useTablePagination();
   const status = searchParams.get("status") ?? undefined;
 
   const { data: result, isLoading } = useQuery({
     queryKey: ["payouts", { page, limit, status }],
     queryFn: () => api.get<any>("/withdrawals/payouts", { page, limit, status }),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const payouts = result?.data ?? [];
-  const meta = result?.meta;
+  const pagination = useTablePaginationMeta(result?.meta, page, limit);
 
   return (
     <div className="space-y-6">
@@ -138,38 +136,7 @@ export function PayoutsListPage() {
               </tbody>
             </table>
           </div>
-          {/* Simple Pagination - normally you'd use a shared component here */}
-          {meta && meta.totalPages > 1 && (
-            <div className="p-4 border-t border-border/40 flex justify-between items-center bg-surface-soft/30">
-              <span className="text-sm text-secondary">
-                Halaman {meta.page} dari {meta.totalPages} (Total: {meta.total} Transaksi)
-              </span>
-              <div className="flex gap-2">
-                <button
-                  disabled={meta.page <= 1}
-                  onClick={() => {
-                    const newParams = new URLSearchParams(searchParams);
-                    newParams.set("page", String(meta.page - 1));
-                    setSearchParams(newParams);
-                  }}
-                  className="px-3 py-1 text-sm bg-surface text-primary border border-border/40 rounded hover:bg-surface-muted disabled:opacity-50"
-                >
-                  Sebelumnya
-                </button>
-                <button
-                  disabled={meta.page >= meta.totalPages}
-                  onClick={() => {
-                    const newParams = new URLSearchParams(searchParams);
-                    newParams.set("page", String(meta.page + 1));
-                    setSearchParams(newParams);
-                  }}
-                  className="px-3 py-1 text-sm bg-surface text-primary border border-border/40 rounded hover:bg-surface-muted disabled:opacity-50"
-                >
-                  Selanjutnya
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination {...pagination} />
         </div>
       )}
     </div>

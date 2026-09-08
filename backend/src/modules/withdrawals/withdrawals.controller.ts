@@ -5,11 +5,18 @@ import { RequirePermission } from "../../common/decorators/require-permission.de
 import { AppError } from "../../common/errors/app.error";
 import { Request } from "express";
 import { PERMISSIONS } from "../../../../shared/constants/permissions";
+import { isPlatformFinance } from "../../../../shared/lib/platform-finance";
 
 @Controller("api/withdrawals")
 @UseGuards(AuthGuard)
 export class WithdrawalsController {
   constructor(private readonly withdrawalsService: WithdrawalsService) { }
+
+  private requirePlatformFinance(req: Request) {
+    if (!isPlatformFinance(req.user)) {
+      throw new AppError("FORBIDDEN", "Penarikan platform hanya dapat diakses oleh Finance Platform.", 403);
+    }
+  }
 
   // ==========================================
   // INSTITUTION ENDPOINTS
@@ -98,13 +105,29 @@ export class WithdrawalsController {
   @Post("platform")
   @RequirePermission(PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE)
   async createPlatformWithdrawal(@Req() req: Request, @Body() body: { amount: number }) {
+    this.requirePlatformFinance(req);
     return this.withdrawalsService.createPlatformWithdrawal(req.user!.id, body.amount);
   }
 
   @Get("platform/balance")
   @RequirePermission(PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE)
-  async getPlatformBalance() {
+  async getPlatformBalance(@Req() req: Request) {
+    this.requirePlatformFinance(req);
     return this.withdrawalsService.getPlatformBalance();
+  }
+
+  @Get("platform")
+  @RequirePermission(PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE)
+  async getPlatformWithdrawals(
+    @Req() req: Request,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    this.requirePlatformFinance(req);
+    return this.withdrawalsService.getPlatformWithdrawals(
+      page === undefined ? 1 : Number(page),
+      limit === undefined ? 10 : Number(limit),
+    );
   }
 
   @Patch("platform/bank")
@@ -113,6 +136,7 @@ export class WithdrawalsController {
     @Req() req: Request,
     @Body() body: { bankCode: string; accountNumber: string; accountHolder: string },
   ) {
+    this.requirePlatformFinance(req);
     return this.withdrawalsService.updatePlatformBankAccount(req.user!.id, body);
   }
 
@@ -125,8 +149,8 @@ export class WithdrawalsController {
   ) {
     return this.withdrawalsService.getAllWithdrawals(
       status,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      page === undefined ? 1 : Number(page),
+      limit === undefined ? 20 : Number(limit)
     );
   }
 
@@ -139,8 +163,8 @@ export class WithdrawalsController {
   ) {
     return this.withdrawalsService.getAllPayouts(
       status,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      page === undefined ? 1 : Number(page),
+      limit === undefined ? 20 : Number(limit)
     );
   }
 

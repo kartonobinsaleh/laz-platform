@@ -8,6 +8,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, invalidateCsrfToken } from "@/lib/api-client";
 import type { VolunteerSessionUser } from "@shared/types/volunteer";
+import { clearSessionCache } from "./session-cache";
 
 /**
  * VolunteerAuthProvider — principal terpisah dari AuthProvider (staff/RBAC).
@@ -54,8 +55,7 @@ export function VolunteerAuthProvider({ children }: { children: ReactNode }) {
       await api.post("/volunteers/logout");
     } finally {
       invalidateCsrfToken();
-      queryClient.setQueryData(["volunteer", "me"], null);
-      queryClient.clear();
+      await clearSessionCache(queryClient);
     }
   }, [queryClient]);
 
