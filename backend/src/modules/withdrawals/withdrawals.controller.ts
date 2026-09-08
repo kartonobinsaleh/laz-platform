@@ -149,8 +149,8 @@ export class WithdrawalsController {
   ) {
     return this.withdrawalsService.getAllWithdrawals(
       status,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      page === undefined ? 1 : Number(page),
+      limit === undefined ? 20 : Number(limit)
     );
   }
 
@@ -163,8 +163,8 @@ export class WithdrawalsController {
   ) {
     return this.withdrawalsService.getAllPayouts(
       status,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20
+      page === undefined ? 1 : Number(page),
+      limit === undefined ? 20 : Number(limit)
     );
   }
 
