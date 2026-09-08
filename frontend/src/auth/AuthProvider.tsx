@@ -8,6 +8,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, invalidateCsrfToken } from "@/lib/api-client";
 import type { RBACSessionUser } from "@shared/types/rbac";
+import { clearSessionCache } from "./session-cache";
 
 /**
  * AuthProvider berbasis useQuery(['auth','me']).
@@ -54,8 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post("/auth/logout");
     } finally {
       invalidateCsrfToken();
-      queryClient.setQueryData(["auth", "me"], null);
-      queryClient.clear();
+      await clearSessionCache(queryClient);
     }
   }, [queryClient]);
 
