@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useGetAllWithdrawals, useApproveWithdrawal, useRejectWithdrawal, useRetryPayout, Withdrawal } from "../api/withdrawals";
+import { useNavigate } from "react-router-dom";
+import { useGetAllWithdrawals, useApproveWithdrawal, useRejectWithdrawal, useRetryPayout, Withdrawal, type WithdrawalScope } from "../api/withdrawals";
 import {
   Card,
   CardContent,
@@ -18,7 +19,9 @@ import { usePermission } from "@/hooks/usePermission";
 import { PERMISSIONS } from "@shared/constants/permissions";
 import { useTablePagination, useTablePaginationMeta } from "@/hooks/useTablePagination";
 
-export function AdminWithdrawalPage() {
+export function AdminWithdrawalPage({ scope }: { scope: WithdrawalScope }) {
+  const isPlatform = scope === "platform";
+  const navigate = useNavigate();
   const { can } = usePermission();
   const canManageWithdrawals = can(PERMISSIONS.WITHDRAWALS_MANAGE);
   const { page, limit, searchParams, setSearchParams } = useTablePagination(20);
@@ -31,7 +34,7 @@ export function AdminWithdrawalPage() {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { data: withdrawals, isLoading } = useGetAllWithdrawals(statusFilter === "ALL" ? undefined : statusFilter, page, limit);
+  const { data: withdrawals, isLoading } = useGetAllWithdrawals(scope, statusFilter === "ALL" ? undefined : statusFilter, page, limit);
   const pagination = useTablePaginationMeta(withdrawals?.meta, page, limit);
   const approveWithdrawal = useApproveWithdrawal();
   const rejectWithdrawal = useRejectWithdrawal();
@@ -116,7 +119,27 @@ export function AdminWithdrawalPage() {
     <>
       <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-surface-stronger">Antrean Pengajuan Penarikan</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-surface-stronger">Approval Penarikan</h1>
+          <p className="mt-1 text-sm text-secondary">
+            Tinjau pengajuan penarikan lembaga dan saldo amil platform.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2" aria-label="Jenis pengajuan penarikan">
+        <Button
+          intent={!isPlatform ? "primary" : "outline"}
+          onClick={() => navigate("/dashboard/withdrawals")}
+        >
+          Penarikan Lembaga
+        </Button>
+        <Button
+          intent={isPlatform ? "primary" : "outline"}
+          onClick={() => navigate("/dashboard/withdrawals/approvals/platform")}
+        >
+          Penarikan Platform
+        </Button>
       </div>
 
       <div className="flex gap-2">
@@ -138,7 +161,7 @@ export function AdminWithdrawalPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Daftar Pengajuan Penarikan</CardTitle>
+          <CardTitle>{isPlatform ? "Pengajuan Amil Platform" : "Pengajuan Lembaga"}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -149,8 +172,9 @@ export function AdminWithdrawalPage() {
                 <thead className="text-xs text-surface-strong uppercase bg-surface-soft">
                   <tr>
                     <th className="px-4 py-3">Tanggal</th>
-                    <th className="px-4 py-3">Lembaga</th>
-                    <th className="px-4 py-3">Program</th>
+                    <th className="px-4 py-3">{isPlatform ? "Pemilik Dana" : "Lembaga"}</th>
+                    <th className="px-4 py-3">Diajukan Oleh</th>
+                    <th className="px-4 py-3">{isPlatform ? "Sumber Dana" : "Program"}</th>
                     <th className="px-4 py-3">Nominal</th>
                     <th className="px-4 py-3">Bank Tujuan</th>
                     <th className="px-4 py-3">Status</th>
@@ -160,7 +184,7 @@ export function AdminWithdrawalPage() {
                 <tbody>
                   {withdrawals?.data?.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-4 text-center text-surface-strong">
+                      <td colSpan={8} className="px-4 py-4 text-center text-surface-strong">
                         Tidak ada pengajuan pencairan
                       </td>
                     </tr>
@@ -171,9 +195,13 @@ export function AdminWithdrawalPage() {
                         {new Date(w.createdAt).toLocaleString("id-ID")}
                       </td>
                       <td className="px-4 py-3 font-medium">
-                        {w.lembaga?.name}
+                        {isPlatform ? "Platform" : (w.lembaga?.name || "-")}
                       </td>
-                      <td className="px-4 py-3">{w.program?.title || (w.lembaga ? "Data lama" : "Platform")}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-primary">{w.requestedBy?.name || "-"}</p>
+                        <p className="mt-0.5 text-xs text-secondary">{w.requestedBy?.email || "-"}</p>
+                      </td>
+                      <td className="px-4 py-3">{isPlatform ? "Porsi Amil Platform" : (w.program?.title || "Data lama")}</td>
                       <td className="px-4 py-3 font-medium text-primary">
                         {formatCurrency(Number(w.amount))}
                       </td>
@@ -252,17 +280,24 @@ export function AdminWithdrawalPage() {
           <div className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-secondary font-medium">Lembaga</p>
-                <p className="font-bold text-primary">{selectedWithdrawal.lembaga?.name || "-"}</p>
+                <p className="text-secondary font-medium">{isPlatform ? "Pemilik Dana" : "Lembaga"}</p>
+                <p className="font-bold text-primary">
+                  {isPlatform ? "Platform" : (selectedWithdrawal.lembaga?.name || "-")}
+                </p>
+              </div>
+              <div>
+                <p className="text-secondary font-medium">Diajukan Oleh</p>
+                <p className="font-bold text-primary">{selectedWithdrawal.requestedBy?.name || "-"}</p>
+                <p className="mt-0.5 text-xs text-secondary">{selectedWithdrawal.requestedBy?.email || "-"}</p>
               </div>
               <div>
                 <p className="text-secondary font-medium">Nominal</p>
                 <p className="font-bold text-primary">{formatCurrency(Number(selectedWithdrawal.amount))}</p>
               </div>
               <div>
-                <p className="text-secondary font-medium">Program Sumber Dana</p>
+                <p className="text-secondary font-medium">{isPlatform ? "Sumber Dana" : "Program Sumber Dana"}</p>
                 <p className="font-bold text-primary">
-                  {selectedWithdrawal.program?.title || (selectedWithdrawal.lembaga ? "Data lama" : "Platform")}
+                  {isPlatform ? "Porsi Amil Platform" : (selectedWithdrawal.program?.title || "Data lama")}
                 </p>
               </div>
               <div>
@@ -323,7 +358,9 @@ export function AdminWithdrawalPage() {
         onClose={() => setIsApproveConfirmOpen(false)}
         onConfirm={confirmApprove}
         title="Konfirmasi Penyetujuan"
-        message="Apakah Anda yakin ingin menyetujui pencairan ini? Dana akan otomatis ditransfer ke rekening lembaga."
+        message={isPlatform
+          ? "Apakah Anda yakin ingin menyetujui penarikan amil platform ini? Dana akan otomatis ditransfer ke rekening platform."
+          : "Apakah Anda yakin ingin menyetujui pencairan ini? Dana akan otomatis ditransfer ke rekening lembaga."}
         confirmText={approveWithdrawal.isPending ? "Memproses..." : "Setujui"}
         cancelText="Batal"
         intent="primary"

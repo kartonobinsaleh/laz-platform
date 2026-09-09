@@ -267,7 +267,15 @@ export const router = createBrowserRouter([
             path: "withdrawals",
             element: (
               <RequirePermission permission={PERMISSIONS.WITHDRAWALS_READ_ALL}>
-                <AdminWithdrawalPage />
+                <AdminWithdrawalPage scope="lembaga" />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "withdrawals/approvals/platform",
+            element: (
+              <RequirePermission permission={PERMISSIONS.WITHDRAWALS_READ_ALL}>
+                <AdminWithdrawalPage scope="platform" />
               </RequirePermission>
             ),
           },

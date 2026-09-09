@@ -99,7 +99,7 @@ export function PlatformWithdrawalPage() {
         )}
       </Dialog>
       <PageHeader title="Penarikan Platform" description="Kelola rekening tujuan dan ajukan penarikan saldo porsi amil platform."
-        action={<Link to="/dashboard/withdrawals" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Antrean penarikan <ArrowRight className="h-4 w-4" />
+        action={<Link to="/dashboard/withdrawals/approvals/platform" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Approval penarikan platform <ArrowRight className="h-4 w-4" />
         </Link>} />
 
       {isLoading ? (

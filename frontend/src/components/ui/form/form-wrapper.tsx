@@ -15,6 +15,7 @@ export interface FormWrapperProps<TFieldValues extends FieldValues> {
   className?: string;
   id?: string;
   error?: string | null;
+  shouldUnregister?: boolean;
 }
 
 export function FormWrapper<TFieldValues extends FieldValues>({
@@ -25,10 +26,12 @@ export function FormWrapper<TFieldValues extends FieldValues>({
   className = "space-y-4",
   id,
   error,
+  shouldUnregister = false,
 }: FormWrapperProps<TFieldValues>) {
   const form = useForm<TFieldValues>({
     resolver: zodResolver(schema) as any,
     defaultValues,
+    shouldUnregister,
   });
 
   const { handleSubmit, formState: { isSubmitting } } = form;

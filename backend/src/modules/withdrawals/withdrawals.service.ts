@@ -481,10 +481,22 @@ export class WithdrawalsService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getAllWithdrawals(status?: string, page = 1, limit = 20) {
+  async getAllWithdrawals(
+    status?: string,
+    page = 1,
+    limit = 20,
+    scope?: "lembaga" | "platform",
+  ) {
     this.validatePagination(page, limit);
     const skip = (page - 1) * limit;
-    const where = status ? { status: status as any } : {};
+    if (scope !== undefined && scope !== "lembaga" && scope !== "platform") {
+      throw new AppError("INVALID_SCOPE", "Scope withdrawal harus lembaga atau platform.", 400);
+    }
+    const where = {
+      ...(status ? { status: status as any } : {}),
+      ...(scope === "lembaga" ? { isPlatform: false } : {}),
+      ...(scope === "platform" ? { isPlatform: true } : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.prisma.withdrawal.findMany({
@@ -505,10 +517,22 @@ export class WithdrawalsService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getAllPayouts(status?: string, page = 1, limit = 20) {
+  async getAllPayouts(
+    status?: string,
+    page = 1,
+    limit = 20,
+    scope?: "lembaga" | "platform",
+  ) {
     this.validatePagination(page, limit);
     const skip = (page - 1) * limit;
-    const where = status ? { status: status as any } : {};
+    if (scope !== undefined && scope !== "lembaga" && scope !== "platform") {
+      throw new AppError("INVALID_SCOPE", "Scope payout harus lembaga atau platform.", 400);
+    }
+    const where = {
+      ...(status ? { status: status as any } : {}),
+      ...(scope === "lembaga" ? { withdrawal: { isPlatform: false } } : {}),
+      ...(scope === "platform" ? { withdrawal: { isPlatform: true } } : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.prisma.payout.findMany({
@@ -517,7 +541,8 @@ export class WithdrawalsService {
         include: {
           withdrawal: {
             include: {
-              lembaga: { select: { name: true, slug: true } }
+              lembaga: { select: { name: true, slug: true } },
+              requestedBy: { select: { name: true, email: true } },
             }
           }
         },

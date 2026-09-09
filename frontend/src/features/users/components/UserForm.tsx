@@ -109,6 +109,7 @@ export function UserForm({
       <FormWrapper<any>
         schema={initialData ? updateUserSchema : createUserSchema}
         onSubmit={onSubmit}
+        shouldUnregister
         defaultValues={
           initialData
             ? {

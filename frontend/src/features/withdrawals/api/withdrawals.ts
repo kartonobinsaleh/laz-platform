@@ -10,6 +10,7 @@ export interface Withdrawal {
   accountHolder: string;
   rejectionReason?: string;
   createdAt: string;
+  isPlatform: boolean;
   lembaga?: { name: string; slug: string };
   requestedBy?: { name: string; email: string };
   approvedBy?: { name: string; email: string };
@@ -103,13 +104,15 @@ export function useGetMyWithdrawals(page = 1, limit = 20) {
   });
 }
 
-export function useGetAllWithdrawals(status?: string, page = 1, limit = 20) {
+export type WithdrawalScope = "lembaga" | "platform";
+
+export function useGetAllWithdrawals(scope: WithdrawalScope, status?: string, page = 1, limit = 20) {
   return useQuery({
-    queryKey: ["all-withdrawals", status, page, limit],
+    queryKey: ["all-withdrawals", "approval", scope, status, page, limit],
     staleTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
-      const { data, meta } = await api.get<Withdrawal[]>("/withdrawals", { status, page, limit });
+      const { data, meta } = await api.get<Withdrawal[]>("/withdrawals", { scope, status, page, limit });
       return { data, meta };
     },
   });

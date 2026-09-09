@@ -144,13 +144,15 @@ export class WithdrawalsController {
   @RequirePermission(PERMISSIONS.WITHDRAWALS_READ_ALL)
   async getAllWithdrawals(
     @Query("status") status?: string,
+    @Query("scope") scope?: "lembaga" | "platform",
     @Query("page") page?: string,
     @Query("limit") limit?: string
   ) {
     return this.withdrawalsService.getAllWithdrawals(
       status,
       page === undefined ? 1 : Number(page),
-      limit === undefined ? 20 : Number(limit)
+      limit === undefined ? 20 : Number(limit),
+      scope,
     );
   }
 
@@ -158,13 +160,15 @@ export class WithdrawalsController {
   @RequirePermission(PERMISSIONS.WITHDRAWALS_READ_ALL)
   async getAllPayouts(
     @Query("status") status?: string,
+    @Query("scope") scope?: "lembaga" | "platform",
     @Query("page") page?: string,
     @Query("limit") limit?: string
   ) {
     return this.withdrawalsService.getAllPayouts(
       status,
       page === undefined ? 1 : Number(page),
-      limit === undefined ? 20 : Number(limit)
+      limit === undefined ? 20 : Number(limit),
+      scope,
     );
   }
 

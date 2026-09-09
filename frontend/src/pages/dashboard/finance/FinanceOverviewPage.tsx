@@ -128,7 +128,7 @@ function PlatformFinanceOverview() {
       {!isLoading && p && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { label: canManageWithdrawals ? "Kelola Withdrawals" : "Lihat Withdrawals", to: "/dashboard/withdrawals", icon: Truck },
+            { label: canManageWithdrawals ? "Approval Penarikan" : "Lihat Penarikan", to: "/dashboard/withdrawals", icon: Truck },
             { label: "Lihat Payouts", to: "/dashboard/payouts", icon: Banknote },
           ].map(({ label, to, icon: Icon }) => (
             <Link

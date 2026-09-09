@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import { PageHeader, TableSkeleton, Badge, Pagination } from "@/components/ui";
+import { PageHeader, TableSkeleton, Badge, Button, Pagination } from "@/components/ui";
 import { useTablePagination, useTablePaginationMeta } from "@/hooks/useTablePagination";
 
 const fmt = (n: number) =>
@@ -31,10 +31,12 @@ const getStatusBadge = (status: string) => {
 export function PayoutsListPage() {
   const { page, limit, searchParams, setSearchParams } = useTablePagination();
   const status = searchParams.get("status") ?? undefined;
+  const scope = searchParams.get("scope") === "platform" ? "platform" : "lembaga";
+  const isPlatform = scope === "platform";
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["payouts", { page, limit, status }],
-    queryFn: () => api.get<any>("/withdrawals/payouts", { page, limit, status }),
+    queryKey: ["payouts", { scope, page, limit, status }],
+    queryFn: () => api.get<any>("/withdrawals/payouts", { scope, page, limit, status }),
     staleTime: 0,
     refetchOnMount: "always",
   });
@@ -46,8 +48,33 @@ export function PayoutsListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Riwayat Penarikan"
-        description="Daftar riwayat penarikan dana ke rekening bank. Status transaksi akan diperbarui secara otomatis."
+        description="Daftar riwayat penarikan lembaga dan finance platform. Status transaksi diperbarui secara otomatis."
       />
+
+      <div className="flex flex-wrap gap-2" aria-label="Jenis riwayat penarikan">
+        <Button
+          intent={!isPlatform ? "primary" : "outline"}
+          onClick={() => {
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete("scope");
+            newParams.set("page", "1");
+            setSearchParams(newParams);
+          }}
+        >
+          Penarikan Lembaga
+        </Button>
+        <Button
+          intent={isPlatform ? "primary" : "outline"}
+          onClick={() => {
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set("scope", "platform");
+            newParams.set("page", "1");
+            setSearchParams(newParams);
+          }}
+        >
+          Penarikan Platform
+        </Button>
+      </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex gap-2">
@@ -77,9 +104,9 @@ export function PayoutsListPage() {
       </div>
       {isLoading ? (
         <TableSkeleton
-          headers={["ID Referensi", "Lembaga", "Nominal", "Bank Tujuan", "Status", "Dibuat Pada", "Selesai Pada"]}
+          headers={["ID Referensi", isPlatform ? "Pemilik Dana" : "Lembaga", "Diajukan Oleh", "Nominal", "Bank Tujuan", "Status", "Dibuat Pada", "Update Terakhir"]}
           rowCount={limit}
-          columnTypes={["text", "text", "text", "text", "text", "text", "text"]}
+          columnTypes={["text", "text", "text", "text", "text", "text", "text", "text"]}
         />
       ) : (
         <div className="bg-surface rounded-2xl border border-border/40 overflow-hidden">
@@ -88,7 +115,8 @@ export function PayoutsListPage() {
               <thead className="text-xs text-surface-strong uppercase bg-surface-soft border-b border-border/40">
                 <tr>
                   <th className="px-6 py-4 font-semibold">ID Referensi</th>
-                  <th className="px-6 py-4 font-semibold">Lembaga</th>
+                  <th className="px-6 py-4 font-semibold">{isPlatform ? "Pemilik Dana" : "Lembaga"}</th>
+                  <th className="px-6 py-4 font-semibold">Diajukan Oleh</th>
                   <th className="px-6 py-4 font-semibold">Nominal</th>
                   <th className="px-6 py-4 font-semibold">Bank Tujuan</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
@@ -99,7 +127,7 @@ export function PayoutsListPage() {
               <tbody className="divide-y divide-border/40">
                 {payouts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-secondary">
+                    <td colSpan={8} className="px-6 py-12 text-center text-secondary">
                       Tidak ada riwayat penarikan yang ditemukan.
                     </td>
                   </tr>
@@ -111,8 +139,12 @@ export function PayoutsListPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-primary">
-                          {payout.withdrawal?.lembaga?.name || "-"}
+                          {isPlatform ? "Platform" : (payout.withdrawal?.lembaga?.name || "-")}
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-primary">{payout.withdrawal?.requestedBy?.name || "-"}</div>
+                        <div className="mt-0.5 text-xs text-secondary">{payout.withdrawal?.requestedBy?.email || "-"}</div>
                       </td>
                       <td className="px-6 py-4 font-bold text-primary">
                         {fmt(Number(payout.amount))}

@@ -45,7 +45,7 @@ export function UsersListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Manajemen Pengguna"
-        description="Daftar semua pengguna staff terdaftar (Super Admin dan Admin Lembaga)."
+        description="Daftar semua pengguna platform"
         action={
           can(PERMISSIONS.USERS_CREATE) ? (
             <Link to="/dashboard/users/new">
