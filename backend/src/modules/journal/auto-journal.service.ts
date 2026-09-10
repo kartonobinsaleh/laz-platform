@@ -259,7 +259,7 @@ export class AutoJournalService {
         bankChartOfAccountId
           ? { accountId: bankChartOfAccountId, debit: amount, description: `Dana penarikan masuk ke ${destination}` }
           : { key: COA_KEYS.BANK, debit: amount, description: `Dana penarikan masuk ke ${destination}` },
-        { key: COA_KEYS.PAYMENT_GATEWAY_RECEIVABLE, credit: amount, description: `Saldo gateway${programLabel} berkurang` },
+        { key: COA_KEYS.PAYMENT_GATEWAY_RECEIVABLE, credit: amount, description: `Saldo rekening${programLabel} berkurang` },
       ],
     });
     await this.postJournal(tx, {
@@ -305,7 +305,7 @@ export class AutoJournalService {
       sourceEvent: "GATEWAY_FEE_POSTED",
       lines: [
         { key: COA_KEYS.BANK_GATEWAY_EXPENSE, debit: amount, description: "Biaya payment gateway" },
-        { key: COA_KEYS.PAYMENT_GATEWAY_RECEIVABLE, credit: amount, description: "Potongan saldo payment gateway" },
+        { key: COA_KEYS.PAYMENT_GATEWAY_RECEIVABLE, credit: amount, description: "Potongan saldo rekening" },
       ],
     });
     await tx.platformBalance.update({ where: { id: "platform" }, data: { balance: { decrement: amount } } });

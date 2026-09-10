@@ -89,7 +89,7 @@ function PlatformFinanceOverview() {
     <div className="space-y-8">
       <PageHeader
         title="Ringkasan Keuangan Platform"
-        description="Saldo aktual dari transaksi donasi berhasil dan saldo payment gateway Platform serta seluruh Lembaga."
+        description="Saldo aktual dari transaksi donasi berhasil dan saldo rekening Platform serta seluruh Lembaga."
       />
 
       {isLoading ? (

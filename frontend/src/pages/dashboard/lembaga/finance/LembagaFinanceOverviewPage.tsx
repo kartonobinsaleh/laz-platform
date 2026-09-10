@@ -192,7 +192,7 @@ function BalanceGuide() {
       />
       <GuideItem
         number="2"
-        title="Saldo payment gateway"
+        title="Saldo Rekening"
         description="Berkurang saat penarikan dana diproses."
         withBorder
       />
@@ -240,7 +240,7 @@ function GatewayBalanceSummary({ available, reserved }: { available: number; res
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="gateway-balance-title" className="text-base font-bold text-primary sm:text-lg">
-                Saldo payment gateway
+                Saldo Rekening
               </h2>
               <span className="rounded-full border border-sky-200 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
                 Untuk penarikan
@@ -268,7 +268,7 @@ function GatewayBalanceSummary({ available, reserved }: { available: number; res
 
         <div className="mt-auto flex flex-col gap-4 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between xl:flex-col xl:items-stretch 2xl:flex-row 2xl:items-center">
           <p className="text-xs leading-relaxed text-secondary">
-            Penyaluran dana tidak mengubah saldo payment gateway.
+            Penyaluran dana tidak mengubah saldo rekening.
           </p>
           <Link
             to="/dashboard/withdrawals/mine"
