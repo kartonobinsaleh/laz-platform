@@ -18,6 +18,49 @@ export class WithdrawalsController {
     }
   }
 
+  private requireSuperAdmin(req: Request) {
+    if (req.user?.roleName !== "SUPER_ADMIN" || req.user.lembagaId) {
+      throw new AppError("FORBIDDEN", "Approval rekening hanya dapat diakses oleh Super Admin.", 403);
+    }
+  }
+
+  @Get("bank-changes/mine")
+  @RequirePermission("withdrawals.read")
+  async getMyBankChanges(@Req() req: Request, @Query("page") page?: string) {
+    if (!req.user!.lembagaId) throw new AppError("FORBIDDEN", "User tidak memiliki Lembaga", 403);
+    return this.withdrawalsService.listBankChanges(req.user!.lembagaId, undefined, page === undefined ? 1 : Number(page));
+  }
+
+  @Get("platform/bank-changes")
+  @RequirePermission(PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE)
+  async getPlatformBankChanges(@Req() req: Request, @Query("page") page?: string) {
+    this.requirePlatformFinance(req);
+    return this.withdrawalsService.listBankChanges(null, undefined, page === undefined ? 1 : Number(page));
+  }
+
+  @Get("bank-changes")
+  @RequirePermission("withdrawals.manage")
+  async getBankChanges(@Req() req: Request, @Query("status") status?: string, @Query("page") page?: string) {
+    this.requireSuperAdmin(req);
+    return this.withdrawalsService.listBankChanges(undefined, status, page === undefined ? 1 : Number(page));
+  }
+
+  @Post("bank-changes/:id/approve")
+  @HttpCode(200)
+  @RequirePermission("withdrawals.manage")
+  async approveBankChange(@Req() req: Request, @Param("id") id: string) {
+    this.requireSuperAdmin(req);
+    return this.withdrawalsService.reviewBankChange(id, req.user!.id, true);
+  }
+
+  @Post("bank-changes/:id/reject")
+  @HttpCode(200)
+  @RequirePermission("withdrawals.manage")
+  async rejectBankChange(@Req() req: Request, @Param("id") id: string, @Body() body: { reason: string }) {
+    this.requireSuperAdmin(req);
+    return this.withdrawalsService.reviewBankChange(id, req.user!.id, false, body.reason);
+  }
+
   // ==========================================
   // INSTITUTION ENDPOINTS
   // ==========================================
@@ -65,10 +108,10 @@ export class WithdrawalsController {
   @Patch("bank-accounts/:id")
   @RequirePermission("withdrawals.create")
   async updateBankAccount(@Req() req: Request, @Param("id") id: string, @Body() body: {
-    bankCode: string; accountNumber: string; accountHolder: string; label?: string; isDefault?: boolean;
+    bankCode: string; accountNumber: string; accountHolder: string; changeReason: string; label?: string; isDefault?: boolean;
   }) {
     if (!req.user!.lembagaId) throw new AppError("FORBIDDEN", "User tidak memiliki Lembaga", 403);
-    return this.withdrawalsService.updateBankAccount(req.user!.lembagaId, id, body);
+    return this.withdrawalsService.updateBankAccount(req.user!.lembagaId, id, body, req.user!.id);
   }
 
   @Post("bank-accounts/:id/deactivate")
@@ -134,7 +177,7 @@ export class WithdrawalsController {
   @RequirePermission(PERMISSIONS.PLATFORM_WITHDRAWALS_CREATE)
   async updatePlatformBank(
     @Req() req: Request,
-    @Body() body: { bankCode: string; accountNumber: string; accountHolder: string },
+    @Body() body: { bankCode: string; accountNumber: string; accountHolder: string; changeReason?: string },
   ) {
     this.requirePlatformFinance(req);
     return this.withdrawalsService.updatePlatformBankAccount(req.user!.id, body);

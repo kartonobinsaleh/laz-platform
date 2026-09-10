@@ -82,7 +82,7 @@ export function LembagaWithdrawalPage() {
 
   const balance = Number(myProfile?.balance?.balance ?? 0);
   const reservedBalance = Number(myProfile?.balance?.reservedBalance ?? 0);
-  const selectedBank = bankAccounts.find((account) => account.isDefault) ?? bankAccounts[0];
+  const selectedBank = bankAccounts.find((account) => account.isActive && account.isDefault) ?? bankAccounts.find((account) => account.isActive);
   const selectedProgram = programBalances.find((item) => item.programId === programId);
   const selectedProgramBalance = Number(selectedProgram?.balance ?? 0);
   const isBankConfigured = Boolean(selectedBank);

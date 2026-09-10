@@ -109,7 +109,7 @@ export class WithdrawalsService {
 
   async listBankAccounts(lembagaId: string) {
     return this.prisma.lembagaBankAccount.findMany({
-      where: { lembagaId, isActive: true },
+      where: { lembagaId },
       include: { chartOfAccount: { select: { id: true, code: true, name: true } } },
       take: 1,
     });
@@ -129,41 +129,12 @@ export class WithdrawalsService {
         where: { lembagaId },
         include: { chartOfAccount: { select: { id: true, code: true, name: true } } },
       });
-      if (existingBank?.isActive) {
+      if (existingBank) {
         throw new AppError(
           "BANK_ACCOUNT_ALREADY_EXISTS",
           "Lembaga hanya boleh memiliki satu rekening Bank. Ubah rekening yang sudah ada.",
           409,
         );
-      }
-
-      if (existingBank) {
-        const accountName = this.bankCoaName(input);
-        await tx.chartOfAccount.update({
-          where: { id: existingBank.chartOfAccountId },
-          data: { name: accountName, isActive: true },
-        });
-        const reactivated = await tx.lembagaBankAccount.update({
-          where: { id: existingBank.id },
-          data: {
-            bankCode: input.bankCode.trim(),
-            accountNumber: input.accountNumber.trim(),
-            accountHolder: input.accountHolder.trim(),
-            label: input.label?.trim() || null,
-            isDefault: true,
-            isActive: true,
-          },
-          include: { chartOfAccount: { select: { id: true, code: true, name: true } } },
-        });
-        await tx.lembaga.update({
-          where: { id: lembagaId },
-          data: {
-            bankCode: reactivated.bankCode,
-            accountNumber: reactivated.accountNumber,
-            accountHolder: reactivated.accountHolder,
-          },
-        });
-        return reactivated;
       }
 
       const parent = await tx.chartOfAccount.findFirst({
@@ -219,62 +190,27 @@ export class WithdrawalsService {
   }
 
   async updateBankAccount(lembagaId: string, id: string, input: {
-    bankCode: string; accountNumber: string; accountHolder: string; label?: string; isDefault?: boolean;
-  }) {
+    bankCode: string; accountNumber: string; accountHolder: string; changeReason: string; label?: string; isDefault?: boolean;
+  }, userId: string) {
     this.validateBankAccount(input);
     return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lembagaId}))`);
       const current = await tx.lembagaBankAccount.findUnique({ where: { lembagaId } });
-      if (current?.id !== id || !current.isActive) {
+      if (current?.id !== id) {
         throw new AppError("BANK_NOT_FOUND", "Rekening Bank tidak ditemukan", 404);
       }
-      const bank = await tx.lembagaBankAccount.update({
-        where: { id },
-        data: {
-          bankCode: input.bankCode.trim(), accountNumber: input.accountNumber.trim(),
-          accountHolder: input.accountHolder.trim(), label: input.label?.trim() || null,
-          isDefault: true,
-          isActive: true,
-          chartOfAccount: { update: { name: this.bankCoaName(input) } },
-        },
-        include: { chartOfAccount: { select: { id: true, code: true, name: true } } },
-      });
-      await tx.lembaga.update({
-        where: { id: lembagaId },
-        data: { bankCode: bank.bankCode, accountNumber: bank.accountNumber, accountHolder: bank.accountHolder },
-      });
-      return bank;
+      return this.createBankChangeRequest(tx, lembagaId, userId, current, input);
     });
   }
 
   async deleteBankAccount(lembagaId: string, id: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const bank = await tx.lembagaBankAccount.findFirst({ where: { id, lembagaId, isActive: true } });
-      if (!bank) throw new AppError("BANK_NOT_FOUND", "Rekening Bank tidak ditemukan", 404);
-      const activeWithdrawal = await tx.withdrawal.count({
-        where: { bankAccountId: id, status: { in: ["PENDING", "APPROVED", "PROCESSING"] } },
-      });
-      if (activeWithdrawal) throw new AppError("BANK_IN_USE", "Rekening masih digunakan oleh pencairan aktif", 409);
-      await tx.lembagaBankAccount.update({ where: { id }, data: { isActive: false, isDefault: false } });
-      await tx.chartOfAccount.update({ where: { id: bank.chartOfAccountId }, data: { isActive: false } });
-      if (bank.isDefault) {
-        const replacement = await tx.lembagaBankAccount.findFirst({
-          where: { lembagaId, isActive: true }, orderBy: { createdAt: "asc" },
-        });
-        if (replacement) {
-          await tx.lembagaBankAccount.update({ where: { id: replacement.id }, data: { isDefault: true } });
-          await tx.lembaga.update({ where: { id: lembagaId }, data: {
-            bankCode: replacement.bankCode, accountNumber: replacement.accountNumber, accountHolder: replacement.accountHolder,
-          } });
-        } else {
-          await tx.lembaga.update({ where: { id: lembagaId }, data: { bankCode: null, accountNumber: null, accountHolder: null } });
-        }
-      }
-      return { success: true };
-    });
+    const bank = await this.prisma.lembagaBankAccount.findFirst({ where: { id, lembagaId } });
+    if (!bank) throw new AppError("BANK_NOT_FOUND", "Rekening Bank tidak ditemukan", 404);
+    throw new AppError("BANK_ACCOUNT_LOCKED", "Rekening utama dikunci. Ajukan perubahan rekening untuk mendapat persetujuan platform Ruang Berbagi.", 409);
   }
 
-  private validateBankAccount(input: { bankCode: string; accountNumber: string; accountHolder: string }) {
-    if (!input.bankCode?.trim() || !/^\d{5,30}$/.test(input.accountNumber?.trim() ?? "") || !input.accountHolder?.trim()) {
+  private validateBankAccount(input: { bankCode: string; accountNumber: string; accountHolder: string; label?: string }) {
+    if (typeof input.bankCode !== "string" || typeof input.accountNumber !== "string" || typeof input.accountHolder !== "string" || (input.label !== undefined && typeof input.label !== "string") || !input.bankCode?.trim() || !/^\d{5,30}$/.test(input.accountNumber?.trim() ?? "") || !input.accountHolder?.trim()) {
       throw new AppError("INVALID_BANK_ACCOUNT", "Bank, nomor rekening 5-30 digit, dan nama pemilik wajib diisi", 400);
     }
   }
@@ -309,32 +245,111 @@ export class WithdrawalsService {
     });
   }
 
-  async updatePlatformBankAccount(userId: string, input: { bankCode: string; accountNumber: string; accountHolder: string }) {
+  async updatePlatformBankAccount(userId: string, input: { bankCode: string; accountNumber: string; accountHolder: string; changeReason?: string }) {
     this.validateBankAccount(input);
-    const balance = await this.prisma.platformBalance.upsert({
-      where: { id: "platform" },
-      update: {
-        bankCode: input.bankCode.trim(),
-        accountNumber: input.accountNumber.trim(),
-        accountHolder: input.accountHolder.trim(),
-      },
-      create: {
-        id: "platform",
-        bankCode: input.bankCode.trim(),
-        accountNumber: input.accountNumber.trim(),
-        accountHolder: input.accountHolder.trim(),
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext('bank-account:platform'))`);
+      const current = await tx.platformBalance.findUnique({ where: { id: "platform" } });
+      if (current?.bankCode || current?.accountNumber || current?.accountHolder) {
+        return this.createBankChangeRequest(tx, null, userId, {
+          bankCode: current.bankCode ?? "", accountNumber: current.accountNumber ?? "",
+          accountHolder: current.accountHolder ?? "",
+        }, input);
+      }
+      const bank = { bankCode: input.bankCode.trim(), accountNumber: input.accountNumber.trim(), accountHolder: input.accountHolder.trim() };
+      const balance = await tx.platformBalance.upsert({
+        where: { id: "platform" }, update: bank, create: { id: "platform", ...bank },
+      });
+      await tx.auditLog.create({ data: {
+        action: "UPDATE", entity: "PlatformBalance", entityId: balance.id, userId, newData: bank,
+      } });
+      return balance;
     });
-    await this.prisma.auditLog.create({
-      data: {
-        action: "UPDATE",
-        entity: "PlatformBalance",
-        entityId: balance.id,
-        userId,
-        newData: { bankCode: balance.bankCode, accountNumber: balance.accountNumber, accountHolder: balance.accountHolder },
-      },
+  }
+
+  private async createBankChangeRequest(
+    tx: Prisma.TransactionClient, lembagaId: string | null, userId: string,
+    current: { bankCode: string; accountNumber: string; accountHolder: string; label?: string | null },
+    input: { bankCode: string; accountNumber: string; accountHolder: string; changeReason?: string; label?: string },
+  ) {
+    if (typeof input.changeReason !== "string" || !input.changeReason.trim() || input.changeReason.trim().length > 2000) {
+      throw new AppError("INVALID_CHANGE_REASON", "Alasan pengubahan wajib diisi (maksimal 2000 karakter).", 400);
+    }
+    const pending = await tx.bankAccountChangeRequest.findFirst({ where: { lembagaId, status: "PENDING" } });
+    if (pending) throw new AppError("BANK_CHANGE_PENDING", "Pengubahan rekening masih menunggu persetujuan platform Ruang Berbagi.", 409);
+    const proposed = {
+      bankCode: input.bankCode.trim(), accountNumber: input.accountNumber.trim(),
+      accountHolder: input.accountHolder.trim(), label: input.label?.trim() || current.label || null,
+    };
+    if (current.bankCode === proposed.bankCode && current.accountNumber === proposed.accountNumber &&
+        current.accountHolder === proposed.accountHolder && (current.label ?? null) === proposed.label) {
+      throw new AppError("BANK_ACCOUNT_UNCHANGED", "Data rekening belum berubah.", 400);
+    }
+    return tx.bankAccountChangeRequest.create({ data: {
+      lembagaId, requestedById: userId, ...proposed, changeReason: input.changeReason.trim(),
+      previousBankCode: current.bankCode, previousAccountNumber: current.accountNumber,
+      previousAccountHolder: current.accountHolder,
+    } });
+  }
+
+  async listBankChanges(lembagaId: string | null | undefined, status?: string, page = 1, limit = 10) {
+    this.validatePagination(page, limit);
+    if (status && !["PENDING", "APPROVED", "REJECTED"].includes(status)) {
+      throw new AppError("INVALID_STATUS", "Status pengubahan rekening tidak valid.", 400);
+    }
+    const where: Prisma.BankAccountChangeRequestWhereInput = {
+      ...(lembagaId !== undefined ? { lembagaId } : {}),
+      ...(status ? { status: status as "PENDING" | "APPROVED" | "REJECTED" } : {}),
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.bankAccountChangeRequest.findMany({
+        where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * limit, take: limit,
+        include: { lembaga: { select: { name: true } }, requestedBy: { select: { name: true } }, reviewedBy: { select: { name: true } } },
+      }),
+      this.prisma.bankAccountChangeRequest.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async reviewBankChange(id: string, userId: string, approve: boolean, reason?: string) {
+    if (!approve && (typeof reason !== "string" || !reason.trim() || reason.trim().length > 2000)) {
+      throw new AppError("INVALID_INPUT", "Alasan penolakan wajib diisi (maksimal 2000 karakter).", 400);
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const initial = await tx.bankAccountChangeRequest.findUnique({ where: { id } });
+      if (!initial) throw new AppError("NOT_FOUND", "Pengajuan rekening tidak ditemukan.", 404);
+      const lockKey = initial.lembagaId ?? "bank-account:platform";
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+      const request = await tx.bankAccountChangeRequest.findUnique({ where: { id } });
+      if (!request || request.status !== "PENDING") {
+        throw new AppError("INVALID_STATE", "Pengajuan rekening sudah diproses.", 409);
+      }
+      if (approve) {
+        const bank = { bankCode: request.bankCode, accountNumber: request.accountNumber, accountHolder: request.accountHolder };
+        if (request.lembagaId) {
+          await tx.lembagaBankAccount.update({
+            where: { lembagaId: request.lembagaId },
+            data: { ...bank, label: request.label, isActive: true, isDefault: true,
+              chartOfAccount: { update: { name: this.bankCoaName({ ...bank, label: request.label ?? undefined }), isActive: true } },
+            },
+          });
+          await tx.lembaga.update({ where: { id: request.lembagaId }, data: bank });
+        } else {
+          await tx.platformBalance.update({ where: { id: "platform" }, data: bank });
+        }
+      }
+      const reviewed = await tx.bankAccountChangeRequest.update({ where: { id }, data: {
+        status: approve ? "APPROVED" : "REJECTED", reviewedById: userId, reviewedAt: new Date(),
+        rejectionReason: approve ? null : reason!.trim(),
+      } });
+      await tx.auditLog.create({ data: {
+        action: "UPDATE", entity: "BankAccountChangeRequest", entityId: id, userId,
+        lembagaId: request.lembagaId,
+        oldData: { bankCode: request.previousBankCode, accountNumber: request.previousAccountNumber, accountHolder: request.previousAccountHolder, status: request.status },
+        newData: { bankCode: request.bankCode, accountNumber: request.accountNumber, accountHolder: request.accountHolder, changeReason: request.changeReason, status: reviewed.status, rejectionReason: reviewed.rejectionReason },
+      } });
+      return reviewed;
     });
-    return balance;
   }
 
   async approveWithdrawal(withdrawalId: string, superAdminId: string) {

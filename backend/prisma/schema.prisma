@@ -41,6 +41,8 @@ model User {
   withdrawalsApproved                Withdrawal[]                @relation("WithdrawalApprover")
   amilPlatformChangeRequestsReviewed AmilPlatformChangeRequest[] @relation("AmilPlatformChangeRequestReviewer")
   notifications                      Notification[]
+  bankChangesRequested               BankAccountChangeRequest[] @relation("BankChangeRequester")
+  bankChangesReviewed                BankAccountChangeRequest[] @relation("BankChangeReviewer")
 
   @@map("users")
 }
@@ -86,6 +88,7 @@ model Lembaga {
   amilPlatformChangeRequests AmilPlatformChangeRequest[]
   accountingBook             AccountingBook?
   bankAccounts               LembagaBankAccount[]
+  bankAccountChangeRequests  BankAccountChangeRequest[]
   approvedBy                 User?                       @relation("LembagaApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@map("lembagas")
@@ -809,6 +812,41 @@ model PlatformBalance {
   updatedAt       DateTime @updatedAt
 
   @@map("platform_balances")
+}
+
+enum BankAccountChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Null lembagaId identifies the single Platform account. The migration enforces
+/// one pending request per owner, including Platform (PostgreSQL partial indexes).
+model BankAccountChangeRequest {
+  id               String                  @id @default(cuid())
+  lembagaId        String?
+  bankCode         String
+  accountNumber    String
+  accountHolder    String
+  changeReason     String
+  label            String?
+  previousBankCode      String
+  previousAccountNumber String
+  previousAccountHolder String
+  status           BankAccountChangeStatus @default(PENDING)
+  rejectionReason  String?
+  requestedById    String
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  lembaga          Lembaga? @relation(fields: [lembagaId], references: [id], onDelete: Cascade, map: "bank_changes_lembaga_fkey")
+  requestedBy      User @relation("BankChangeRequester", fields: [requestedById], references: [id], onDelete: Restrict, map: "bank_changes_requester_fkey")
+  reviewedBy       User? @relation("BankChangeReviewer", fields: [reviewedById], references: [id], onDelete: Restrict, map: "bank_changes_reviewer_fkey")
+
+  @@index([lembagaId, createdAt])
+  @@index([status, createdAt])
+  @@map("bank_account_change_requests")
 }
 
 // ─── Withdrawal ───────────────────────────────────────────────────────────────

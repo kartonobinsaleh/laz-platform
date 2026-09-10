@@ -21,6 +21,7 @@ export interface NavItem {
    */
   requiresLembaga?: boolean;
   requiresPlatformFinance?: boolean;
+  requiresSuperAdmin?: boolean;
   children?: NavItem[];
 }
 
@@ -78,6 +79,13 @@ export const NAV_ITEMS: NavItem[] = [
         href: "/dashboard/withdrawals",
         icon: "Banknote",
         permission: PERMISSIONS.WITHDRAWALS_READ_ALL,
+      },
+      {
+        label: "Approval Rekening",
+        href: "/dashboard/withdrawals/bank-approvals",
+        icon: "CreditCard",
+        permission: PERMISSIONS.WITHDRAWALS_MANAGE,
+        requiresSuperAdmin: true,
       },
       {
         label: "Riwayat Penarikan",

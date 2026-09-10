@@ -16,7 +16,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("Bank account creation (PostgreS
   });
   afterAll(() => prisma.$disconnect());
 
-  it("creates the account and COA, rejects duplicates, and reactivates the same account", async () => {
+  it("activates the first account immediately and applies subsequent changes only after approval", async () => {
     const rollback = new Error("Rollback test fixtures");
     await expect(prisma.$transaction(async (tx) => {
       const lembaga = await tx.lembaga.create({
@@ -32,9 +32,12 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("Bank account creation (PostgreS
           accountType: "ASSET", normalBalance: "DEBIT", isHeader: true, level: 3,
         },
       });
+      const role = await tx.role.create({ data: { name: 'BANK_TEST_' + randomUUID() } });
+      const requester = await tx.user.create({ data: { email: randomUUID() + '@bank.test', roleId: role.id, lembagaId: lembaga.id } });
+      const reviewer = await tx.user.create({ data: { email: randomUUID() + '@bank.test', roleId: role.id } });
       // Keep service transactions inside the real rollback-only test transaction.
       const service = new WithdrawalsService(
-        { $transaction: (fn: (client: Prisma.TransactionClient) => unknown) => fn(tx) } as unknown as PrismaService,
+        { ...tx, $transaction: (fn: (client: Prisma.TransactionClient) => unknown) => fn(tx) } as unknown as PrismaService,
         {} as WithdrawalsRepository,
         {} as XenditService,
       );
@@ -47,15 +50,27 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("Bank account creation (PostgreS
       await expect(service.createBankAccount(lembaga.id, input)).rejects.toMatchObject({
         code: "BANK_ACCOUNT_ALREADY_EXISTS", status: 409,
       });
-      await service.deleteBankAccount(lembaga.id, bank.id);
-      const replacement = { ...input, accountNumber: "9876543210" };
-      const reactivated = await service.createBankAccount(lembaga.id, replacement);
-      expect(reactivated).toMatchObject({ ...replacement, id: bank.id, isActive: true });
-      expect(reactivated.chartOfAccount.id).toBe(bank.chartOfAccount.id);
-      expect(await tx.lembagaBankAccount.count({ where: { lembagaId: lembaga.id } })).toBe(1);
-      expect(await tx.chartOfAccount.findUnique({ where: { id: bank.chartOfAccount.id } }))
-        .toMatchObject({ isActive: true, name: "Bank BCA - 3210" });
+      await expect(service.deleteBankAccount(lembaga.id, bank.id)).rejects.toMatchObject({ code: "BANK_ACCOUNT_LOCKED" });
+      const replacement = { ...input, bankCode: "ID_BNI", accountNumber: "9876543210" };
+      const changeInput = { ...replacement, changeReason: "Pergantian rekening operasional" };
+      const pending = await service.updateBankAccount(lembaga.id, bank.id, changeInput, requester.id);
+      expect(pending).toMatchObject({ status: "PENDING", changeReason: changeInput.changeReason, previousAccountNumber: input.accountNumber });
+      expect(await tx.lembagaBankAccount.findUnique({ where: { id: bank.id } })).toMatchObject(input);
+      expect(await tx.lembaga.findUnique({ where: { id: lembaga.id } })).toMatchObject(input);
+      await expect(service.updateBankAccount(lembaga.id, bank.id, changeInput, requester.id)).rejects.toMatchObject({ code: "BANK_CHANGE_PENDING" });
+      await service.reviewBankChange(pending.id, reviewer.id, false, "Nama belum sesuai");
+      expect(await tx.bankAccountChangeRequest.findUnique({ where: { id: pending.id } })).toMatchObject({ status: "REJECTED", rejectionReason: "Nama belum sesuai" });
+      expect(await tx.lembagaBankAccount.findUnique({ where: { id: bank.id } })).toMatchObject(input);
+      const next = await service.updateBankAccount(lembaga.id, bank.id, changeInput, requester.id);
+      await service.reviewBankChange(next.id, reviewer.id, true);
+      expect(await tx.lembagaBankAccount.findUnique({ where: { id: bank.id } })).toMatchObject({ ...replacement, isActive: true });
+      expect(await tx.chartOfAccount.findUnique({ where: { id: bank.chartOfAccount.id } })).toMatchObject({ name: "Bank BNI - 3210" });
       expect(await tx.lembaga.findUnique({ where: { id: lembaga.id } })).toMatchObject(replacement);
+      await expect(service.reviewBankChange(next.id, reviewer.id, false, "Terlambat")).rejects.toMatchObject({ code: "INVALID_STATE" });
+      expect(await tx.lembagaBankAccount.count({ where: { lembagaId: lembaga.id } })).toBe(1);
+      // Legacy inactive records must not allow a fresh initial bank to bypass approval.
+      await tx.lembagaBankAccount.update({ where: { id: bank.id }, data: { isActive: false } });
+      await expect(service.createBankAccount(lembaga.id, input)).rejects.toMatchObject({ code: "BANK_ACCOUNT_ALREADY_EXISTS" });
       throw rollback;
     }, { timeout: 15000 })).rejects.toBe(rollback);
   });

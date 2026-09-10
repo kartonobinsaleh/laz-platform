@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useCreatePlatformWithdrawal, usePlatformBalance, useSavePlatformBankAccount, type Withdrawal } from "../api/withdrawals";
+import { useBankChanges, useCreatePlatformWithdrawal, usePlatformBalance, useSavePlatformBankAccount, type Withdrawal } from "../api/withdrawals";
 import { Badge, Button, Card, CardContent, Dialog, PageHeader, Input, Select } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/stores/toast.store";
@@ -8,10 +8,13 @@ import { ArrowRight, CheckCircle2, Clock3, Info, Landmark, Pencil, Plus, Wallet 
 import { BANK_OPTIONS, getBankLabel } from "../constants/banks";
 import { formatIdrAmountInput } from "../utils/amount";
 import { PlatformWithdrawalHistory } from "../components/PlatformWithdrawalHistory";
+import { BANK_CHANGE_WARNING, BankChangeHistory } from "../components/BankChangeHistory";
 
 export function PlatformWithdrawalPage() {
   const { data: platformBalance, isLoading, isError, isFetching, refetch } = usePlatformBalance();
   const saveBank = useSavePlatformBankAccount();
+  const changes = useBankChanges("platform");
+  const pendingChange = changes.data?.data.some((request) => request.status === "PENDING");
   const createWithdrawal = useCreatePlatformWithdrawal();
   const submitting = useRef(false);
   const [amount, setAmount] = useState("");
@@ -19,6 +22,7 @@ export function PlatformWithdrawalPage() {
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountHolder, setAccountHolder] = useState("");
+  const [changeReason, setChangeReason] = useState("");
   const [bankError, setBankError] = useState("");
   const [submitted, setSubmitted] = useState<Withdrawal | null>(null);
 
@@ -35,22 +39,23 @@ export function PlatformWithdrawalPage() {
     setBankCode(platformBalance?.bankCode ?? "");
     setAccountNumber(platformBalance?.accountNumber ?? "");
     setAccountHolder(platformBalance?.accountHolder ?? "");
+    setChangeReason("");
     setBankError("");
     setEditingBank(true);
   };
 
   const handleSaveBank = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saveBank.isPending) return;
-    if (!bankCode || !/^\d{5,30}$/.test(accountNumber) || !accountHolder.trim()) {
-      setBankError("Pilih bank, isi nomor rekening 5–30 digit, dan nama pemilik rekening.");
+    if (saveBank.isPending || pendingChange) return;
+    if (!bankCode || !/^\d{5,30}$/.test(accountNumber) || !accountHolder.trim() || (isBankConfigured && !changeReason.trim())) {
+      setBankError(isBankConfigured ? "Lengkapi data rekening dan alasan pengubahan." : "Pilih bank, isi nomor rekening 5–30 digit, dan nama pemilik rekening.");
       return;
     }
     setBankError("");
     try {
-      await saveBank.mutateAsync({ bankCode, accountNumber, accountHolder: accountHolder.trim() });
+      await saveBank.mutateAsync({ bankCode, accountNumber, accountHolder: accountHolder.trim(), ...(isBankConfigured ? { changeReason: changeReason.trim() } : {}) });
       setEditingBank(false);
-      toast.success("Rekening tujuan berhasil disimpan");
+      toast.success(isBankConfigured ? "Pengubahan rekening diajukan. Status pending menunggu persetujuan platform Ruang Berbagi." : "Rekening tujuan berhasil disimpan dan langsung dapat digunakan.");
     } catch (error: unknown) {
       setBankError(error instanceof Error ? error.message : "Rekening gagal disimpan. Silakan coba lagi.");
     }
@@ -144,9 +149,10 @@ export function PlatformWithdrawalPage() {
                     <p className="mt-1 text-sm text-secondary">Dana akan dikirim ke rekening yang tersimpan di sini.</p>
                   </div>
                 </div>
+                {pendingChange && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Pengubahan rekening masih pending. Rekening lama tetap aktif sampai disetujui platform Ruang Berbagi.</p>}
                 {editingBank ? (
                   <form onSubmit={handleSaveBank} className="space-y-4">
-                    <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Perubahan rekening perlu disimpan sebelum Anda mengajukan penarikan.</div>
+                    <div role="note" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{isBankConfigured ? BANK_CHANGE_WARNING : "Rekening pertama langsung aktif setelah disimpan. Perubahan berikutnya memerlukan persetujuan platform Ruang Berbagi."}</div>
                     <fieldset disabled={saveBank.isPending} className="space-y-4">
                       <div>
                         <label htmlFor="platform-bank" className="mb-1.5 block text-sm font-medium text-primary">Bank tujuan</label>
@@ -162,10 +168,15 @@ export function PlatformWithdrawalPage() {
                         <label htmlFor="platform-account-holder" className="mb-1.5 block text-sm font-medium text-primary">Nama pemilik rekening</label>
                         <Input id="platform-account-holder" value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} required placeholder="Sesuai nama pada rekening bank" />
                       </div>
+                      {isBankConfigured && <div>
+                        <label htmlFor="platform-bank-change-reason" className="mb-1.5 block text-sm font-medium text-primary">Alasan pengubahan</label>
+                        <textarea id="platform-bank-change-reason" className="min-h-28 w-full resize-y rounded-xl border border-border bg-surface p-3 text-sm" maxLength={2000} required value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Jelaskan alasan rekening utama perlu diubah" />
+                        <p className="mt-1.5 text-xs text-secondary">Wajib diisi · maksimal 2.000 karakter ({changeReason.length}/2.000)</p>
+                      </div>}
                     </fieldset>
                     {bankError && <p role="alert" className="text-sm text-destructive">{bankError}</p>}
                     <div className="flex flex-wrap gap-2">
-                      <Button type="submit" isLoading={saveBank.isPending}>Simpan rekening</Button>
+                      <Button type="submit" isLoading={saveBank.isPending} disabled={pendingChange || (isBankConfigured && (changes.isLoading || changes.isError))}>{isBankConfigured ? "Ajukan pengubahan rekening" : "Simpan rekening"}</Button>
                       <Button intent="ghost" onClick={() => setEditingBank(false)} disabled={saveBank.isPending}>Batal</Button>
                     </div>
                   </form>
@@ -183,7 +194,7 @@ export function PlatformWithdrawalPage() {
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-xs text-secondary">Pastikan data rekening sudah benar.</p>
-                      <Button intent="outline" size="sm" onClick={startEditBank} disabled={createWithdrawal.isPending}>
+                      <Button intent="outline" size="sm" disabled={pendingChange || changes.isLoading || changes.isError || createWithdrawal.isPending} onClick={startEditBank}>
                         <Pencil className="mr-2 h-3.5 w-3.5" /> Ubah rekening</Button>
                     </div>
                   </>
@@ -229,6 +240,7 @@ export function PlatformWithdrawalPage() {
               </CardContent>
             </Card>
           </div>
+          <BankChangeHistory scope="platform" />
           <PlatformWithdrawalHistory />
         </>
       )}

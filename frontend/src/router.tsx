@@ -68,6 +68,7 @@ import { LedgerPage } from "@/pages/dashboard/ledger/LedgerPage";
 import { LembagaWithdrawalPage } from "@/features/withdrawals/pages/LembagaWithdrawalPage";
 import { AdminWithdrawalPage } from "@/features/withdrawals/pages/AdminWithdrawalPage";
 import { PlatformWithdrawalPage } from "@/features/withdrawals/pages/PlatformWithdrawalPage";
+import { BankAccountApprovalPage } from "@/features/withdrawals/pages/BankAccountApprovalPage";
 import { FinanceOverviewPage } from "@/pages/dashboard/finance/FinanceOverviewPage";
 import { PayoutsListPage } from "@/pages/dashboard/finance/PayoutsListPage";
 import { LembagaFinanceOverviewPage } from "@/pages/dashboard/lembaga/finance/LembagaFinanceOverviewPage";
@@ -255,6 +256,14 @@ export const router = createBrowserRouter([
             ),
           },
           // Pencairan Dana (Withdrawal)
+          {
+            path: "withdrawals/bank-approvals",
+            element: (
+              <RequirePermission permission={PERMISSIONS.WITHDRAWALS_MANAGE} requiresSuperAdmin>
+                <BankAccountApprovalPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: "withdrawals/mine",
             element: (

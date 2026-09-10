@@ -13,16 +13,18 @@ export function RequirePermission({
   permission,
   children,
   requiresPlatformFinance = false,
+  requiresSuperAdmin = false,
 }: {
   permission: PermissionKey;
   children: ReactNode;
   requiresPlatformFinance?: boolean;
+  requiresSuperAdmin?: boolean;
 }) {
   const { can, isLoading } = usePermission();
   const { user } = useAuth();
 
   if (isLoading) return null;
-  if (!can(permission) || (requiresPlatformFinance && !isPlatformFinance(user))) {
+  if (!can(permission) || (requiresPlatformFinance && !isPlatformFinance(user)) || (requiresSuperAdmin && (user?.roleName !== "SUPER_ADMIN" || !!user.lembagaId))) {
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;

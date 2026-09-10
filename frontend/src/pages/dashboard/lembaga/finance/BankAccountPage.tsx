@@ -6,25 +6,30 @@ import { PageHeader, Input, Select, Button, Card, CardContent } from "@/componen
 import { toast } from "@/stores/toast.store";
 import {
   useBankAccounts,
+  useBankChanges,
   useSaveBankAccount,
   type LembagaBankAccount,
 } from "@/features/withdrawals/api/withdrawals";
 import { BANK_OPTIONS, getBankLabel } from "@/features/withdrawals/constants/banks";
+import { BANK_CHANGE_WARNING, BankChangeHistory } from "@/features/withdrawals/components/BankChangeHistory";
 
 type FormState = {
   id?: string;
   bankCode: string;
   accountNumber: string;
   accountHolder: string;
+  changeReason: string;
 };
 
 const emptyForm: FormState = {
-  bankCode: "", accountNumber: "", accountHolder: "",
+  bankCode: "", accountNumber: "", accountHolder: "", changeReason: "",
 };
 
 export function BankAccountPage() {
   const { user } = useAuth();
-  const { data: accounts = [], isLoading } = useBankAccounts();
+  const { data: accounts = [], isLoading, isError, refetch } = useBankAccounts();
+  const changes = useBankChanges("lembaga");
+  const pendingChange = changes.data?.data.some((request) => request.status === "PENDING");
   const save = useSaveBankAccount();
   const [form, setForm] = useState<FormState | null>(null);
 
@@ -35,16 +40,18 @@ export function BankAccountPage() {
     bankCode: account.bankCode,
     accountNumber: account.accountNumber,
     accountHolder: account.accountHolder,
+    changeReason: "",
   });
 
   const submit = async () => {
-    if (!form?.bankCode || !/^\d{5,30}$/.test(form.accountNumber) || !form.accountHolder.trim()) {
-      toast.error("Lengkapi Bank, nomor rekening 5-30 digit, dan nama pemilik.");
+    if (save.isPending || pendingChange) return;
+    if (!form?.bankCode || !/^\d{5,30}$/.test(form.accountNumber) || !form.accountHolder.trim() || (form.id && !form.changeReason.trim())) {
+      toast.error(form?.id ? "Lengkapi data rekening dan alasan pengubahan." : "Lengkapi Bank, nomor rekening 5-30 digit, dan nama pemilik.");
       return;
     }
     try {
       await save.mutateAsync(form);
-      toast.success(form.id ? "Rekening berhasil diperbarui." : "Rekening lembaga berhasil disimpan.");
+      toast.success(form.id ? "Pengubahan rekening diajukan. Status pending menunggu persetujuan platform Ruang Berbagi." : "Rekening lembaga berhasil disimpan dan langsung dapat digunakan.");
       setForm(null);
     } catch (error: any) {
       toast.error(error?.message || "Gagal menyimpan rekening Bank");
@@ -56,7 +63,9 @@ export function BankAccountPage() {
       <PageHeader title="Rekening Bank Lembaga"
         description="Satu rekening resmi digunakan untuk seluruh pencairan dana Lembaga." />
 
-      {!accounts.length && !isLoading && (
+      {isError && <div role="alert"><p>Rekening belum dapat dimuat.</p><Button onClick={() => void refetch()}>Coba lagi</Button></div>}
+      {pendingChange && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Pengubahan rekening masih pending. Rekening lama tetap aktif sampai platform Ruang Berbagi menyetujui pengajuan.</p>}
+      {!accounts.length && !isLoading && !isError && (
         <div className="flex justify-end">
           <Button onClick={() => setForm({ ...emptyForm })}>
             <Plus className="w-4 h-4 mr-2" /> Tambah Rekening
@@ -68,6 +77,7 @@ export function BankAccountPage() {
         <Card>
           <CardContent className="p-6 space-y-4">
             <h2 className="font-bold text-primary">{form.id ? "Ubah Rekening" : "Tambah Rekening"}</h2>
+            <p role="note" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{form.id ? BANK_CHANGE_WARNING : "Rekening pertama langsung aktif setelah disimpan. Perubahan berikutnya memerlukan persetujuan platform Ruang Berbagi."}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Bank</label>
@@ -88,10 +98,15 @@ export function BankAccountPage() {
                 <Input value={form.accountHolder}
                   onChange={(event) => setForm({ ...form, accountHolder: event.target.value })} />
               </div>
+              {form.id && <div className="space-y-2 md:col-span-2">
+                <label htmlFor="lembaga-bank-change-reason" className="text-sm font-medium">Alasan pengubahan</label>
+                <textarea id="lembaga-bank-change-reason" className="min-h-28 w-full resize-y rounded-xl border border-border bg-surface p-3 text-sm" maxLength={2000} required value={form.changeReason} onChange={(event) => setForm({ ...form, changeReason: event.target.value })} placeholder="Jelaskan alasan rekening utama perlu diubah" />
+                <p className="text-xs text-secondary">Wajib diisi · maksimal 2.000 karakter ({form.changeReason.length}/2.000)</p>
+              </div>}
             </div>
             <div className="flex justify-end gap-2">
-              <Button intent="outline" onClick={() => setForm(null)}>Batal</Button>
-              <Button onClick={submit} isLoading={save.isPending}>Simpan</Button>
+              <Button intent="outline" disabled={save.isPending} onClick={() => setForm(null)}>Batal</Button>
+              <Button onClick={submit} isLoading={save.isPending} disabled={pendingChange || (Boolean(form.id) && (changes.isLoading || changes.isError))}>{form.id ? "Ajukan pengubahan rekening" : "Simpan rekening"}</Button>
             </div>
           </CardContent>
         </Card>
@@ -154,7 +169,7 @@ export function BankAccountPage() {
                         </span>
                         <div>
                           <p className="font-bold text-primary">Detail Rekening Utama</p>
-                          <p className="text-sm text-secondary">Digunakan otomatis untuk seluruh pencairan.</p>
+                          <p className="text-sm text-secondary">{account.isActive ? "Digunakan otomatis untuk seluruh pencairan." : "Rekening tidak aktif. Ajukan perubahan untuk mengaktifkan rekening pengganti."}</p>
                         </div>
                       </div>
                       <dl className="mt-6 space-y-4 text-sm">
@@ -177,7 +192,7 @@ export function BankAccountPage() {
                       </dl>
                     </div>
                     <div className="mt-6 flex justify-end">
-                      <Button size="sm" intent="outline" onClick={() => edit(account)}>
+                      <Button size="sm" intent="outline" disabled={pendingChange || changes.isLoading || changes.isError || save.isPending} onClick={() => edit(account)}>
                         <Pencil className="mr-1.5 h-4 w-4" /> Ubah Rekening
                       </Button>
                     </div>
@@ -186,9 +201,10 @@ export function BankAccountPage() {
               </CardContent>
             </Card>
           ))}
-          {!accounts.length && <p className="text-secondary">Belum ada rekening Bank. Tambahkan rekening pertama untuk mulai melakukan pencairan.</p>}
+          {!accounts.length && !isError && <p className="text-secondary">Belum ada rekening Bank. Tambahkan rekening pertama untuk mulai melakukan pencairan.</p>}
         </div>
       )}
+      <BankChangeHistory scope="lembaga" />
     </div>
   );
 }

@@ -39,7 +39,7 @@ describe.each(["getAllWithdrawals", "getAllPayouts"] as const)("%s pagination", 
     ["", "10"], ["9007199254740991", "100"],
   ])("rejects invalid page/limit %s/%s before querying the database", async (page, limit) => {
     const { model, controller } = setup();
-    await expect(controller[method](undefined, page, limit)).rejects.toMatchObject({ code: "INVALID_PAGINATION" });
+    await expect(controller[method](undefined, undefined, page, limit)).rejects.toMatchObject({ code: "INVALID_PAGINATION" });
     expect(model.findMany).not.toHaveBeenCalled();
     expect(model.count).not.toHaveBeenCalled();
   });
